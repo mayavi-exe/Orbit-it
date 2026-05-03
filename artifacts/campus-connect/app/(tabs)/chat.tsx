@@ -6,11 +6,10 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
   TextInput,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabPadding } from "@/hooks/useTabPadding";
 import {
   useGetConversations,
   useSearchUsers,
@@ -34,10 +33,8 @@ function timeAgo(dateStr: string | null | undefined): string {
 
 export default function ChatScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const { topPad, bottomPad } = useTabPadding();
   const router = useRouter();
-  const topPad = Platform.OS === "web" ? 16 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 80;
 
   const [searchQuery, setSearchQuery] = useState("");
   const isSearching = searchQuery.trim().length > 0;

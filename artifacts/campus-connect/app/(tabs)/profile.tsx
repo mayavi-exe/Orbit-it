@@ -8,11 +8,10 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  Platform,
   useWindowDimensions,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabPadding } from "@/hooks/useTabPadding";
 import { useAuth, useUser } from "@clerk/expo";
 import {
   useGetMe,
@@ -33,13 +32,11 @@ const INTERESTS = [
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const { topPad, bottomPad } = useTabPadding();
   const { signOut } = useAuth();
   const { user: clerkUser } = useUser();
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
-  const topPad = Platform.OS === "web" ? 16 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 80;
 
   const [editing, setEditing] = useState(false);
 

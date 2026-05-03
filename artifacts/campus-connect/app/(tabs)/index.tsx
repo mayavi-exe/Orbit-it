@@ -10,11 +10,10 @@ import {
   Modal,
   TextInput,
   Switch,
-  Platform,
   Alert,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabPadding } from "@/hooks/useTabPadding";
 import {
   useGetFeed,
   useCreatePost,
@@ -43,11 +42,9 @@ const TYPE_COLORS: Record<PostType, string> = {
 
 export default function FeedScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const { topPad, bottomPad } = useTabPadding();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const topPad = Platform.OS === "web" ? 16 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 80;
 
   const [filter, setFilter] = useState<PostType | undefined>(undefined);
   const [showCreate, setShowCreate] = useState(false);

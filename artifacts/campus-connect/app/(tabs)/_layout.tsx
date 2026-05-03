@@ -5,7 +5,15 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect } from "react";
-import { Platform, StyleSheet, View, Text, TouchableOpacity, useColorScheme } from "react-native";
+import {
+  Platform,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  useWindowDimensions,
+} from "react-native";
 import { useAuth } from "@clerk/expo";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
@@ -18,6 +26,37 @@ function useClerkToken() {
     }
   }, [isSignedIn, getToken]);
 }
+
+const NAV_ITEMS = [
+  {
+    href: "/(tabs)" as const,
+    segment: "index",
+    label: "Feed",
+    icon: "home-outline" as const,
+    activeIcon: "home" as const,
+  },
+  {
+    href: "/(tabs)/discover" as const,
+    segment: "discover",
+    label: "Discover",
+    icon: "compass-outline" as const,
+    activeIcon: "compass" as const,
+  },
+  {
+    href: "/(tabs)/chat" as const,
+    segment: "chat",
+    label: "Messages",
+    icon: "chatbubbles-outline" as const,
+    activeIcon: "chatbubbles" as const,
+  },
+  {
+    href: "/(tabs)/profile" as const,
+    segment: "profile",
+    label: "Profile",
+    icon: "person-circle-outline" as const,
+    activeIcon: "person-circle" as const,
+  },
+];
 
 function NativeTabLayout() {
   return (
@@ -126,106 +165,138 @@ function ClassicTabLayout() {
 
 function WebLayout() {
   useClerkToken();
+
+  const { width } = useWindowDimensions();
   const colors = useColors();
   const pathname = usePathname();
   const router = useRouter();
 
-  const navItems = [
-    {
-      href: "/(tabs)" as const,
-      segment: "index",
-      label: "Feed",
-      icon: "home-outline" as const,
-      activeIcon: "home" as const,
-    },
-    {
-      href: "/(tabs)/discover" as const,
-      segment: "discover",
-      label: "Discover",
-      icon: "compass-outline" as const,
-      activeIcon: "compass" as const,
-    },
-    {
-      href: "/(tabs)/chat" as const,
-      segment: "chat",
-      label: "Messages",
-      icon: "chatbubbles-outline" as const,
-      activeIcon: "chatbubbles" as const,
-    },
-    {
-      href: "/(tabs)/profile" as const,
-      segment: "profile",
-      label: "Profile",
-      icon: "person-circle-outline" as const,
-      activeIcon: "person-circle" as const,
-    },
-  ];
-
   const currentSegment =
-    pathname === "/" || pathname === "" ? "index" : pathname.replace(/^\//, "").split("/")[0];
+    pathname === "/" || pathname === ""
+      ? "index"
+      : pathname.replace(/^\//, "").split("/")[0];
 
-  return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: colors.background }}>
-      <View
-        style={{
-          width: 220,
-          borderRightWidth: 1,
-          borderRightColor: colors.border,
-          backgroundColor: colors.background,
-          paddingTop: 32,
-          paddingBottom: 24,
-          paddingHorizontal: 12,
-        }}
-      >
-        <View style={{ paddingHorizontal: 8, marginBottom: 36 }}>
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 10,
-            }}
-          >
-            <Ionicons name="school-outline" size={20} color="#fff" />
+  const isSidebar = width >= 768;
+
+  if (isSidebar) {
+    return (
+      <View style={{ flex: 1, flexDirection: "row", backgroundColor: colors.background }}>
+        {/* Sidebar */}
+        <View
+          style={{
+            width: 220,
+            borderRightWidth: 1,
+            borderRightColor: colors.border,
+            backgroundColor: colors.background,
+            paddingTop: 32,
+            paddingBottom: 24,
+            paddingHorizontal: 12,
+          }}
+        >
+          <View style={{ paddingHorizontal: 8, marginBottom: 36 }}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.primary,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 10,
+              }}
+            >
+              <Ionicons name="school-outline" size={20} color="#fff" />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
+              Campus Connect
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
+              Mumbai colleges
+            </Text>
           </View>
-          <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
-            Campus Connect
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
-            Mumbai colleges
-          </Text>
+
+          {NAV_ITEMS.map((item) => {
+            const active = currentSegment === item.segment;
+            return (
+              <TouchableOpacity
+                key={item.label}
+                onPress={() => router.push(item.href)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 11,
+                  borderRadius: 12,
+                  marginBottom: 2,
+                  backgroundColor: active ? colors.primary + "18" : "transparent",
+                }}
+              >
+                <Ionicons
+                  name={active ? item.activeIcon : item.icon}
+                  size={22}
+                  color={active ? colors.primary : colors.mutedForeground}
+                />
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: active ? "700" : "500",
+                    color: active ? colors.primary : colors.foreground,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {navItems.map((item) => {
+        {/* Content */}
+        <View style={{ flex: 1, overflow: "hidden" }}>
+          <Slot />
+        </View>
+      </View>
+    );
+  }
+
+  // Narrow web: bottom tab bar
+  return (
+    <View style={{ flex: 1, flexDirection: "column", backgroundColor: colors.background }}>
+      <View style={{ flex: 1, overflow: "hidden" }}>
+        <Slot />
+      </View>
+      <View
+        style={{
+          height: 64,
+          flexDirection: "row",
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          backgroundColor: colors.background,
+        }}
+      >
+        {NAV_ITEMS.map((item) => {
           const active = currentSegment === item.segment;
           return (
             <TouchableOpacity
               key={item.label}
               onPress={() => router.push(item.href)}
               style={{
-                flexDirection: "row",
+                flex: 1,
                 alignItems: "center",
-                gap: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 11,
-                borderRadius: 12,
-                marginBottom: 2,
-                backgroundColor: active ? colors.primary + "18" : "transparent",
+                justifyContent: "center",
+                gap: 3,
               }}
             >
               <Ionicons
                 name={active ? item.activeIcon : item.icon}
-                size={22}
+                size={24}
                 color={active ? colors.primary : colors.mutedForeground}
               />
               <Text
                 style={{
-                  fontSize: 15,
+                  fontSize: 10,
                   fontWeight: active ? "700" : "500",
-                  color: active ? colors.primary : colors.foreground,
+                  color: active ? colors.primary : colors.mutedForeground,
                 }}
               >
                 {item.label}
@@ -233,10 +304,6 @@ function WebLayout() {
             </TouchableOpacity>
           );
         })}
-      </View>
-
-      <View style={{ flex: 1, overflow: "hidden" }}>
-        <Slot />
       </View>
     </View>
   );

@@ -9,10 +9,9 @@ import {
   ActivityIndicator,
   ScrollView,
   TextInput,
-  Platform,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabPadding } from "@/hooks/useTabPadding";
 import {
   useGetRecommendations,
   useSwipe,
@@ -32,7 +31,7 @@ import { useRouter } from "expo-router";
 
 export default function DiscoverScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const { topPad, bottomPad } = useTabPadding();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [mode, setMode] = useState<"swipe" | "list">("swipe");
@@ -42,8 +41,6 @@ export default function DiscoverScreen() {
   const [searchTab, setSearchTab] = useState<"people" | "posts">("people");
   const swipeMutation = useSwipe();
   const startConvMutation = useStartConversation();
-  const topPad = Platform.OS === "web" ? 16 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 80;
 
   const isSearching = searchQuery.trim().length > 0;
 
