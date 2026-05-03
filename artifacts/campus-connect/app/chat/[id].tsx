@@ -18,12 +18,34 @@ import {
   useSendMessage,
   getGetMessagesQueryKey,
   getGetConversationsQueryKey,
+  GetConversations200,
 } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useChatSocket, type ChatMessage } from "@/hooks/useChatSocket";
+import { UserAvatar } from "@/components/UserAvatar";
+
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatGroupHeader(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+  if (isToday) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) +
+    " · " +
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+const TIME_GAP_MS = 30 * 60 * 1000;
 
 export default function ChatRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,14 +59,42 @@ export default function ChatRoomScreen() {
   const listRef = useRef<FlatList>(null);
   const initializedRef = useRef(false);
 
+  const convData = queryClient.getQueryData<GetConversations200>(getGetConversationsQueryKey());
+  const conv = convData?.conversations?.find(c => c.id === id);
+  const otherUser = conv?.otherUser;
+
   const { data, isLoading } = useGetMessages(id ?? "", undefined, {
     query: { queryKey: getGetMessagesQueryKey(id ?? ""), enabled: !!id },
   });
   const sendMutation = useSendMessage();
 
   useEffect(() => {
-    navigation.setOptions({ title: "Chat" });
-  }, []);
+    if (otherUser?.name) {
+      navigation.setOptions({
+        title: otherUser.name,
+        headerTitleAlign: "center" as const,
+        headerTitle: () => (
+          <View style={{ alignItems: "center" }}>
+            <Text style={{ fontWeight: "700", fontSize: 15, color: colors.foreground }}>
+              {otherUser.name}
+            </Text>
+          </View>
+        ),
+        headerRight: () => (
+          <View style={{ flexDirection: "row", gap: 16, marginRight: 4 }}>
+            <TouchableOpacity>
+              <Feather name="phone" size={22} color={colors.foreground} />
+            </TouchableOpacity>
+            <TouchableOpacity>
+              <Feather name="video" size={22} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+        ),
+      });
+    } else {
+      navigation.setOptions({ title: "Chat" });
+    }
+  }, [otherUser?.name, colors.foreground]);
 
   useEffect(() => {
     if (data?.messages && !initializedRef.current) {
@@ -53,15 +103,18 @@ export default function ChatRoomScreen() {
     }
   }, [data?.messages]);
 
-  const handleNewMessage = useCallback((msg: ChatMessage) => {
-    if (msg.senderId === user?.id) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setLocalMessages(prev => {
-      if (prev.some(m => m.id === msg.id)) return prev;
-      return [msg, ...prev];
-    });
-    queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
-  }, [user?.id]);
+  const handleNewMessage = useCallback(
+    (msg: ChatMessage) => {
+      if (msg.senderId === user?.id) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setLocalMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [msg, ...prev];
+      });
+      queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+    },
+    [user?.id]
+  );
 
   useChatSocket(id ?? null, handleNewMessage);
 
@@ -87,8 +140,20 @@ export default function ChatRoomScreen() {
   };
 
   const myId = user?.id;
-
   const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 4;
+  const hasText = message.trim().length > 0;
+
+  type ItemType = ChatMessage | { type: "timestamp"; key: string; label: string };
+
+  const listData: ItemType[] = [];
+  for (let i = 0; i < localMessages.length; i++) {
+    const msg = localMessages[i];
+    const prev = localMessages[i + 1];
+    listData.push(msg);
+    if (!prev || new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() > TIME_GAP_MS) {
+      listData.push({ type: "timestamp", key: `ts-${msg.id}`, label: formatGroupHeader(prev?.createdAt ?? msg.createdAt) });
+    }
+  }
 
   return (
     <KeyboardAvoidingView
@@ -103,32 +168,63 @@ export default function ChatRoomScreen() {
       ) : (
         <FlatList
           ref={listRef}
-          data={localMessages}
-          keyExtractor={(item) => item.id}
+          data={listData}
+          keyExtractor={(item) => ("type" in item ? item.key : item.id)}
           inverted
-          contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12 }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Say hello to start the conversation
+              {otherUser && (
+                <View style={styles.emptyAvatarWrap}>
+                  <UserAvatar
+                    name={otherUser.name}
+                    profilePhotos={otherUser.profilePhotos}
+                    size={72}
+                  />
+                </View>
+              )}
+              <Text style={[styles.emptyName, { color: colors.foreground }]}>
+                {otherUser?.name ?? ""}
+              </Text>
+              <Text style={[styles.emptyHint, { color: colors.mutedForeground }]}>
+                Say hello to start the conversation 👋
               </Text>
             </View>
           }
           renderItem={({ item }) => {
+            if ("type" in item) {
+              return (
+                <View style={styles.tsRow}>
+                  <Text style={[styles.tsText, { color: colors.mutedForeground }]}>{item.label}</Text>
+                </View>
+              );
+            }
             const isMe = item.senderId === myId;
             return (
-              <View style={[styles.bubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+              <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
+                {!isMe && (
+                  <View style={styles.receiverAvatar}>
+                    <UserAvatar
+                      name={otherUser?.name ?? "?"}
+                      profilePhotos={otherUser?.profilePhotos}
+                      size={28}
+                    />
+                  </View>
+                )}
                 <View
                   style={[
-                    styles.bubbleBg,
-                    {
-                      backgroundColor: isMe ? colors.primary : colors.card,
-                      borderColor: colors.border,
-                      borderWidth: isMe ? 0 : 1,
-                    },
+                    styles.bubble,
+                    isMe
+                      ? [styles.bubbleSent, { backgroundColor: colors.primary }]
+                      : [styles.bubbleReceived, { backgroundColor: colors.card }],
                   ]}
                 >
-                  <Text style={[styles.bubbleText, { color: isMe ? colors.primaryForeground : colors.foreground }]}>
+                  <Text
+                    style={[
+                      styles.bubbleText,
+                      { color: isMe ? colors.primaryForeground : colors.foreground },
+                    ]}
+                  >
                     {item.content}
                   </Text>
                 </View>
@@ -141,30 +237,47 @@ export default function ChatRoomScreen() {
       <View
         style={[
           styles.inputBar,
-          { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: bottomPad },
+          {
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
+            paddingBottom: bottomPad,
+          },
         ]}
       >
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.input, color: colors.foreground }]}
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Type a message..."
-          placeholderTextColor={colors.mutedForeground}
-          multiline
-          maxLength={500}
-          returnKeyType="send"
-          blurOnSubmit={false}
-          onSubmitEditing={handleSend}
-        />
+        <TouchableOpacity style={styles.inputIcon}>
+          <Feather name="camera" size={24} color={colors.foreground} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.inputIcon}>
+          <Feather name="image" size={24} color={colors.foreground} />
+        </TouchableOpacity>
+
+        <View style={[styles.inputPill, { backgroundColor: colors.input, borderColor: colors.border }]}>
+          <TextInput
+            style={[styles.input, { color: colors.foreground }]}
+            value={message}
+            onChangeText={setMessage}
+            placeholder="Message..."
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            maxLength={500}
+            returnKeyType="default"
+          />
+        </View>
+
         <TouchableOpacity
-          style={[styles.sendBtn, { backgroundColor: message.trim() ? colors.primary : colors.muted }]}
+          style={[
+            styles.sendBtn,
+            { backgroundColor: hasText ? colors.primary : "transparent" },
+          ]}
           onPress={handleSend}
-          disabled={!message.trim() || sendMutation.isPending}
+          disabled={sendMutation.isPending}
         >
           {sendMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : hasText ? (
+            <Feather name="send" size={18} color={colors.primaryForeground} />
           ) : (
-            <Feather name="send" size={20} color={message.trim() ? colors.primaryForeground : colors.mutedForeground} />
+            <Feather name="heart" size={22} color={colors.primary} />
           )}
         </TouchableOpacity>
       </View>
@@ -175,28 +288,64 @@ export default function ChatRoomScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
-  emptyText: { fontSize: 15, textAlign: "center" },
-  bubble: { marginBottom: 6 },
-  bubbleLeft: { alignItems: "flex-start" },
-  bubbleRight: { alignItems: "flex-end" },
-  bubbleBg: { maxWidth: "80%", borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleText: { fontSize: 15, lineHeight: 22 },
+  emptyContainer: { flex: 1, alignItems: "center", paddingTop: 48, gap: 10 },
+  emptyAvatarWrap: { marginBottom: 4 },
+  emptyName: { fontSize: 17, fontWeight: "700" },
+  emptyHint: { fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
+  tsRow: { alignItems: "center", marginVertical: 12 },
+  tsText: { fontSize: 12, fontWeight: "500" },
+  msgRow: { flexDirection: "row", alignItems: "flex-end", marginBottom: 4, gap: 6 },
+  msgRowLeft: { justifyContent: "flex-start" },
+  msgRowRight: { justifyContent: "flex-end" },
+  receiverAvatar: { width: 28, flexShrink: 0 },
+  bubble: {
+    maxWidth: "75%",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  bubbleSent: {
+    borderBottomRightRadius: 4,
+  },
+  bubbleReceived: {
+    borderBottomLeftRadius: 4,
+  },
+  bubbleText: { fontSize: 15, lineHeight: 21 },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingTop: 10,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  input: {
+  inputIcon: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 2,
+  },
+  inputPill: {
     flex: 1,
     borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "web" ? 8 : 6,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  input: {
     fontSize: 15,
     maxHeight: 100,
+    padding: 0,
   },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 2,
+  },
 });

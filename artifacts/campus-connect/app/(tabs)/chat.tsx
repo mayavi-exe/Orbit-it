@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
+  ScrollView,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useTabPadding } from "@/hooks/useTabPadding";
@@ -14,11 +15,14 @@ import {
   useGetConversations,
   useSearchUsers,
   useStartConversation,
+  useGetMatches,
   getGetConversationsQueryKey,
   getSearchUsersQueryKey,
+  getGetMatchesQueryKey,
 } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { UserAvatar } from "@/components/UserAvatar";
 
 function timeAgo(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
@@ -28,14 +32,15 @@ function timeAgo(dateStr: string | null | undefined): string {
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function ChatScreen() {
   const colors = useColors();
   const { topPad, bottomPad } = useTabPadding();
   const router = useRouter();
-
   const [searchQuery, setSearchQuery] = useState("");
   const isSearching = searchQuery.trim().length > 0;
 
@@ -45,6 +50,10 @@ export default function ChatScreen() {
     query: { queryKey: getGetConversationsQueryKey(), enabled: !isSearching },
   });
 
+  const { data: matchesData } = useGetMatches({
+    query: { queryKey: getGetMatchesQueryKey(), enabled: !isSearching },
+  });
+
   const { data: userResults, isFetching: searchingUsers } = useSearchUsers(
     { q: searchQuery.trim(), limit: 20 },
     { query: { queryKey: getSearchUsersQueryKey({ q: searchQuery.trim(), limit: 20 }), enabled: isSearching } }
@@ -52,6 +61,12 @@ export default function ChatScreen() {
 
   const conversations = data?.conversations ?? [];
   const searchedUsers = userResults?.users ?? [];
+  const allMatches = matchesData?.matches ?? [];
+
+  const activeConvUserIds = new Set(conversations.map(c => c.otherUser?.id).filter(Boolean));
+  const freshMatches = allMatches
+    .filter(m => m.otherUser && !activeConvUserIds.has(m.otherUser.id))
+    .slice(0, 12);
 
   const handleMessage = (userId: string) => {
     startConvMutation.mutate(
@@ -63,12 +78,20 @@ export default function ChatScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Messages</Text>
-        <View style={[styles.searchBar, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <Feather name="search" size={16} color={colors.mutedForeground} />
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: colors.foreground }]}>Messages</Text>
+          <TouchableOpacity
+            style={[styles.composeBtn, { backgroundColor: colors.primary + "18" }]}
+            onPress={() => setSearchQuery("")}
+          >
+            <Feather name="edit-2" size={18} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.searchBar, { backgroundColor: colors.muted }]}>
+          <Feather name="search" size={15} color={colors.mutedForeground} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search people to message..."
+            placeholder="Search"
             placeholderTextColor={colors.mutedForeground}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -76,7 +99,7 @@ export default function ChatScreen() {
           />
           {isSearching && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Feather name="x" size={16} color={colors.mutedForeground} />
+              <Feather name="x-circle" size={15} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -84,40 +107,33 @@ export default function ChatScreen() {
 
       {isSearching ? (
         searchingUsers ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
         ) : searchedUsers.length === 0 ? (
           <View style={styles.center}>
-            <Feather name="users" size={48} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No users found</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Try a different name or username
-            </Text>
+            <Feather name="search" size={48} color={colors.mutedForeground} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No results</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different name or username</Text>
           </View>
         ) : (
           <FlatList
             data={searchedUsers}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: bottomPad }}
+            contentContainerStyle={{ paddingBottom: bottomPad, paddingTop: 8 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.row, { borderBottomColor: colors.border }]}
+                style={styles.row}
                 onPress={() => handleMessage(item.id)}
                 disabled={startConvMutation.isPending}
+                activeOpacity={0.7}
               >
-                <View style={[styles.avatar, { backgroundColor: colors.primary + "30" }]}>
-                  <Text style={[styles.avatarText, { color: colors.primary }]}>
-                    {item.name?.[0]?.toUpperCase() ?? "?"}
-                  </Text>
-                </View>
+                <UserAvatar name={item.name} profilePhotos={item.profilePhotos} size={56} />
                 <View style={styles.info}>
                   <Text style={[styles.name, { color: colors.foreground }]}>{item.name}</Text>
                   {item.username && (
-                    <Text style={[styles.username, { color: colors.primary }]}>@{item.username}</Text>
+                    <Text style={[styles.subtext, { color: colors.mutedForeground }]}>@{item.username}</Text>
                   )}
-                  {item.college && (
-                    <Text style={[styles.preview, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {item.college?.name && (
+                    <Text style={[styles.subtext, { color: colors.mutedForeground }]} numberOfLines={1}>
                       {item.college.name}
                     </Text>
                   )}
@@ -126,73 +142,123 @@ export default function ChatScreen() {
                   {startConvMutation.isPending ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Feather name="message-circle" size={18} color="#fff" />
+                    <Feather name="message-circle" size={16} color="#fff" />
                   )}
                 </View>
               </TouchableOpacity>
             )}
           />
         )
-      ) : isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
       ) : (
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: bottomPad, flexGrow: 1 }}
-          onRefresh={refetch}
-          refreshing={isLoading}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Feather name="message-square" size={48} color={colors.mutedForeground} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No messages yet</Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Search for someone above to start chatting
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.row, { borderBottomColor: colors.border }]}
-              onPress={() => router.push(`/chat/${item.id}` as any)}
-            >
-              <View style={[styles.avatar, { backgroundColor: colors.primary + "30" }]}>
-                <Text style={[styles.avatarText, { color: colors.primary }]}>
-                  {item.otherUser?.name?.[0]?.toUpperCase() ?? "?"}
-                </Text>
-              </View>
-              <View style={styles.info}>
-                <View style={styles.nameRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.name, { color: colors.foreground }]}>
-                      {item.otherUser?.name ?? "User"}
-                    </Text>
-                    {item.otherUser?.username && (
-                      <Text style={[styles.username, { color: colors.primary }]}>
-                        @{item.otherUser.username}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[styles.time, { color: colors.mutedForeground }]}>
-                    {timeAgo(item.lastMessageAt)}
-                  </Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={[styles.preview, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    {item.lastMessage ?? "Start a conversation"}
-                  </Text>
-                  {(item.unreadCount ?? 0) > 0 && (
-                    <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                      <Text style={styles.badgeText}>{item.unreadCount}</Text>
+        <>
+          {freshMatches.length > 0 && (
+            <View style={[styles.matchesSection, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.matchesLabel, { color: colors.mutedForeground }]}>New Matches</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.matchesScroll}
+              >
+                {freshMatches.map(m => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.matchItem}
+                    onPress={() => m.otherUser && handleMessage(m.otherUser.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.matchRing, { borderColor: colors.primary }]}>
+                      <View style={styles.matchAvatarInner}>
+                        <UserAvatar
+                          name={m.otherUser?.name ?? "?"}
+                          profilePhotos={m.otherUser?.profilePhotos}
+                          size={52}
+                        />
+                      </View>
                     </View>
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
+                    <Text style={[styles.matchName, { color: colors.foreground }]} numberOfLines={1}>
+                      {m.otherUser?.name?.split(" ")[0] ?? ""}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           )}
-        />
+
+          {isLoading ? (
+            <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+          ) : (
+            <FlatList
+              data={conversations}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: bottomPad, flexGrow: 1, paddingTop: 4 }}
+              onRefresh={refetch}
+              refreshing={isLoading}
+              ListEmptyComponent={
+                <View style={styles.center}>
+                  <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
+                    <Feather name="message-circle" size={32} color={colors.mutedForeground} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No messages yet</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    Match with someone and say hello
+                  </Text>
+                </View>
+              }
+              renderItem={({ item }) => {
+                const unread = (item.unreadCount ?? 0) > 0;
+                return (
+                  <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => router.push(`/chat/${item.id}` as any)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.avatarWrap,
+                      unread && { borderWidth: 2.5, borderColor: colors.primary, borderRadius: 32, padding: 2 },
+                    ]}>
+                      <UserAvatar
+                        name={item.otherUser?.name ?? "?"}
+                        profilePhotos={item.otherUser?.profilePhotos}
+                        size={54}
+                      />
+                    </View>
+
+                    <View style={styles.info}>
+                      <View style={styles.nameRow}>
+                        <Text
+                          style={[styles.name, { color: colors.foreground, fontWeight: unread ? "700" : "500" }]}
+                          numberOfLines={1}
+                        >
+                          {item.otherUser?.name ?? "User"}
+                        </Text>
+                        <Text style={[styles.time, { color: colors.mutedForeground }]}>
+                          {timeAgo(item.lastMessageAt)}
+                        </Text>
+                      </View>
+                      <View style={styles.previewRow}>
+                        <Text
+                          style={[
+                            styles.preview,
+                            {
+                              color: unread ? colors.foreground : colors.mutedForeground,
+                              fontWeight: unread ? "600" : "400",
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.lastMessage ?? "Tap to start a conversation"}
+                        </Text>
+                        {unread && (
+                          <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </>
       )}
     </View>
   );
@@ -201,38 +267,79 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 10 },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 12 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  title: { fontSize: 26, fontWeight: "800" },
+  composeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
   },
   searchInput: { flex: 1, fontSize: 15 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingTop: 60 },
-  emptyTitle: { fontSize: 20, fontWeight: "bold" },
-  emptyText: { fontSize: 15, textAlign: "center", paddingHorizontal: 32 },
+  emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  emptyTitle: { fontSize: 18, fontWeight: "700" },
+  emptyText: { fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
+  matchesSection: {
+    paddingTop: 14,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  matchesLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  matchesScroll: { paddingHorizontal: 12, gap: 18 },
+  matchItem: { alignItems: "center", width: 66 },
+  matchRing: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 2.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  matchAvatarInner: { borderRadius: 28, overflow: "hidden" },
+  matchName: { fontSize: 12, fontWeight: "500", textAlign: "center" },
   row: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    gap: 12,
+    paddingVertical: 10,
+    gap: 14,
   },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontWeight: "700", fontSize: 20 },
-  info: { flex: 1 },
-  nameRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 },
-  name: { fontSize: 16, fontWeight: "600" },
-  username: { fontSize: 13, fontWeight: "500", marginBottom: 2 },
-  time: { fontSize: 12, marginTop: 2 },
+  avatarWrap: { borderRadius: 32 },
+  info: { flex: 1, minWidth: 0 },
+  nameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 3,
+  },
+  name: { fontSize: 15, flex: 1, marginRight: 8 },
+  subtext: { fontSize: 13, marginTop: 1 },
+  time: { fontSize: 12 },
   previewRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  preview: { flex: 1, fontSize: 14 },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  msgBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  preview: { flex: 1, fontSize: 13 },
+  unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
+  msgBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
 });

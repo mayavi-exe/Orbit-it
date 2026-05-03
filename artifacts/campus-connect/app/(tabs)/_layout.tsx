@@ -139,6 +139,7 @@ function ClassicTabLayout() {
         name="chat"
         options={{
           title: "Messages",
+          headerShown: false,
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? "message.fill" : "message"} tintColor={color} size={24} />
