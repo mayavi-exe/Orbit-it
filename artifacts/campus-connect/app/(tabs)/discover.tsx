@@ -19,10 +19,12 @@ import {
   useGetMatchStats,
   useSearchUsers,
   useSearchPosts,
+  useGetSuggestions,
   getGetRecommendationsQueryKey,
   getGetMatchStatsQueryKey,
   getSearchUsersQueryKey,
   getSearchPostsQueryKey,
+  getGetSuggestionsQueryKey,
   useStartConversation,
 } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
@@ -53,6 +55,11 @@ export default function DiscoverScreen() {
   const { data: statsData } = useGetMatchStats({
     query: { queryKey: getGetMatchStatsQueryKey(), enabled: !isSearching },
   });
+
+  const { data: suggestionsData } = useGetSuggestions(
+    { limit: 15 },
+    { query: { queryKey: getGetSuggestionsQueryKey({ limit: 15 }), enabled: !isSearching } }
+  );
 
   const { data: userResults, isFetching: searchingUsers } = useSearchUsers(
     { q: searchQuery.trim(), limit: 20 },
@@ -195,6 +202,49 @@ export default function DiscoverScreen() {
           </View>
         )}
       </View>
+
+      {!isSearching && (suggestionsData?.suggestions ?? []).length > 0 && (
+        <View style={[styles.suggestionsSection, { borderBottomColor: colors.border }]}>
+          <View style={styles.suggestionsTitleRow}>
+            <Feather name="users" size={14} color={colors.primary} />
+            <Text style={[styles.suggestionsTitle, { color: colors.foreground }]}>People You May Know</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScroll}>
+            {(suggestionsData?.suggestions ?? []).map(s => (
+              <TouchableOpacity
+                key={s.user.id}
+                style={[styles.suggestionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => router.push(`/user/${s.user.id}` as any)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.suggestionAvatarWrap}>
+                  <UserAvatar name={s.user.name} profilePhotos={s.user.profilePhotos} size={56} />
+                </View>
+                <Text style={[styles.suggestionName, { color: colors.foreground }]} numberOfLines={1}>
+                  {s.user.name.split(" ")[0]}
+                </Text>
+                <View style={styles.suggestionMutualRow}>
+                  <Feather name="heart" size={10} color={colors.primary} />
+                  <Text style={[styles.suggestionMutual, { color: colors.mutedForeground }]}>
+                    {s.mutualCount} mutual
+                  </Text>
+                </View>
+                {s.commonInterests.length > 0 && (
+                  <Text style={[styles.suggestionInterest, { color: colors.primary }]} numberOfLines={1}>
+                    {s.commonInterests[0]}
+                  </Text>
+                )}
+                <TouchableOpacity
+                  style={[styles.suggestionMsgBtn, { backgroundColor: colors.primary }]}
+                  onPress={(e) => { e.stopPropagation(); handleMessage(s.user.id); }}
+                >
+                  <Feather name="message-circle" size={13} color="#fff" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {isSearching ? (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad }}>
@@ -408,6 +458,31 @@ export default function DiscoverScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  suggestionsSection: { borderBottomWidth: 1, paddingBottom: 12 },
+  suggestionsTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 },
+  suggestionsTitle: { fontSize: 13, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  suggestionsScroll: { paddingHorizontal: 12, gap: 10 },
+  suggestionCard: {
+    width: 100,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 10,
+    alignItems: "center",
+    gap: 4,
+  },
+  suggestionAvatarWrap: { marginBottom: 2 },
+  suggestionName: { fontSize: 13, fontWeight: "600", textAlign: "center" },
+  suggestionMutualRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  suggestionMutual: { fontSize: 11 },
+  suggestionInterest: { fontSize: 11, fontWeight: "600", textAlign: "center" },
+  suggestionMsgBtn: {
+    marginTop: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   header: { paddingHorizontal: 16, paddingBottom: 8 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   title: { fontSize: 28, fontWeight: "bold" },

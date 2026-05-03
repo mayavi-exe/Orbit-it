@@ -40,6 +40,8 @@ import type {
   GetMessagesParams,
   GetRecommendations200,
   GetRecommendationsParams,
+  GetSuggestions200,
+  GetSuggestionsParams,
   HealthStatus,
   LikeResponse,
   LoginRequest,
@@ -2173,6 +2175,100 @@ export function useGetMatchStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetMatchStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get "people you may know" — friends of friends via mutual matches
+ */
+export const getGetSuggestionsUrl = (params?: GetSuggestionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/match/suggestions?${stringifiedParams}`
+    : `/api/match/suggestions`;
+};
+
+export const getSuggestions = async (
+  params?: GetSuggestionsParams,
+  options?: RequestInit,
+): Promise<GetSuggestions200> => {
+  return customFetch<GetSuggestions200>(getGetSuggestionsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSuggestionsQueryKey = (params?: GetSuggestionsParams) => {
+  return [`/api/match/suggestions`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetSuggestionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSuggestions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetSuggestionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSuggestions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSuggestionsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSuggestions>>> = ({
+    signal,
+  }) => getSuggestions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSuggestions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSuggestionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSuggestions>>
+>;
+export type GetSuggestionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get "people you may know" — friends of friends via mutual matches
+ */
+
+export function useGetSuggestions<
+  TData = Awaited<ReturnType<typeof getSuggestions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetSuggestionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSuggestions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSuggestionsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

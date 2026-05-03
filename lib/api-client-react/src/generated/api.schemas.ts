@@ -253,6 +253,13 @@ export interface RecommendedUser {
   commonInterests: string[];
 }
 
+export interface SuggestedUser {
+  user: PublicUserProfile;
+  /** Number of mutual matches shared with the current user */
+  mutualCount: number;
+  commonInterests: string[];
+}
+
 export type SwipeAction = (typeof SwipeAction)[keyof typeof SwipeAction];
 
 export const SwipeAction = {
@@ -394,6 +401,14 @@ export type GetRecommendations200 = {
 
 export type GetMatches200 = {
   matches: Match[];
+};
+
+export type GetSuggestionsParams = {
+  limit?: number;
+};
+
+export type GetSuggestions200 = {
+  suggestions: SuggestedUser[];
 };
 
 export type GetBlockedUsers200 = {

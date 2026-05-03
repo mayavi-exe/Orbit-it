@@ -152,6 +152,96 @@ router.get("/match", requireAuth, async (req, res) => {
   res.json({ matches: formatted });
 });
 
+router.get("/match/suggestions", requireAuth, async (req, res) => {
+  const limit = Math.min(Number(req.query["limit"]) || 15, 50);
+  const myId = req.userId!;
+
+  const [me] = await db.select().from(usersTable).where(eq(usersTable.id, myId)).limit(1);
+  if (!me) { res.status(404).json({ error: "NOT_FOUND", message: "User not found" }); return; }
+
+  const alreadySwiped = await db
+    .select({ toUserId: swipesTable.toUserId })
+    .from(swipesTable)
+    .where(eq(swipesTable.fromUserId, myId));
+  const swipedIds = alreadySwiped.map(s => s.toUserId);
+
+  const blocked = await db
+    .select({ blockedUserId: blocksTable.blockedUserId, blockerId: blocksTable.blockerId })
+    .from(blocksTable)
+    .where(or(eq(blocksTable.blockerId, myId), eq(blocksTable.blockedUserId, myId)));
+  const blockedIds = blocked.map(b => b.blockerId === myId ? b.blockedUserId : b.blockerId);
+
+  const excludeIds = new Set([myId, ...swipedIds, ...blockedIds]);
+
+  const myMatches = await db
+    .select({ user1Id: matchesTable.user1Id, user2Id: matchesTable.user2Id })
+    .from(matchesTable)
+    .where(and(
+      or(eq(matchesTable.user1Id, myId), eq(matchesTable.user2Id, myId)),
+      eq(matchesTable.isActive, true),
+    ));
+
+  const myMatchedUserIds = myMatches.map(m => m.user1Id === myId ? m.user2Id : m.user1Id);
+
+  if (myMatchedUserIds.length === 0) {
+    res.json({ suggestions: [] }); return;
+  }
+
+  const friendsOfFriendsMatches = await db
+    .select({ user1Id: matchesTable.user1Id, user2Id: matchesTable.user2Id })
+    .from(matchesTable)
+    .where(and(
+      or(
+        inArray(matchesTable.user1Id, myMatchedUserIds),
+        inArray(matchesTable.user2Id, myMatchedUserIds),
+      ),
+      eq(matchesTable.isActive, true),
+    ));
+
+  const mutualCountMap = new Map<string, number>();
+  for (const m of friendsOfFriendsMatches) {
+    const candidateId = myMatchedUserIds.includes(m.user1Id) ? m.user2Id : m.user1Id;
+    if (!excludeIds.has(candidateId)) {
+      mutualCountMap.set(candidateId, (mutualCountMap.get(candidateId) ?? 0) + 1);
+    }
+  }
+
+  const sortedCandidateIds = [...mutualCountMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id);
+
+  if (sortedCandidateIds.length === 0) {
+    res.json({ suggestions: [] }); return;
+  }
+
+  const candidates = await db
+    .select()
+    .from(usersTable)
+    .where(and(
+      inArray(usersTable.id, sortedCandidateIds),
+      eq(usersTable.isActive, true),
+      eq(usersTable.isBanned, false),
+    ));
+
+  const formatted = await Promise.all(
+    sortedCandidateIds
+      .map(id => candidates.find(c => c.id === id))
+      .filter(Boolean)
+      .map(async candidate => {
+        const [col] = await db.select().from(collegesTable).where(eq(collegesTable.id, candidate!.collegeId)).limit(1);
+        const commonInterests = me.interests.filter(i => candidate!.interests.includes(i));
+        return {
+          user: mapPublicProfile(candidate!, col ?? null),
+          mutualCount: mutualCountMap.get(candidate!.id) ?? 0,
+          commonInterests,
+        };
+      })
+  );
+
+  res.json({ suggestions: formatted });
+});
+
 router.get("/match/stats", requireAuth, async (req, res) => {
   const userId = req.userId!;
 

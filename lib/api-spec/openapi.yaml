@@ -575,6 +575,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/MatchStats"
 
+  /match/suggestions:
+    get:
+      operationId: getSuggestions
+      tags: [match]
+      summary: Get "people you may know" — friends of friends via mutual matches
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 15
+      responses:
+        "200":
+          description: Suggested users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SuggestedUser"
+                required:
+                  - suggestions
+
   # --- SAFETY ---
   /report:
     post:
@@ -1346,6 +1374,23 @@ components:
       required:
         - user
         - compatibilityScore
+        - commonInterests
+
+    SuggestedUser:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/PublicUserProfile"
+        mutualCount:
+          type: integer
+          description: Number of mutual matches shared with the current user
+        commonInterests:
+          type: array
+          items:
+            type: string
+      required:
+        - user
+        - mutualCount
         - commonInterests
 
     SwipeAction:
