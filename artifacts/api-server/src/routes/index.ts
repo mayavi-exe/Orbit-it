@@ -7,6 +7,7 @@ import chatRouter from "./chat.js";
 import matchRouter from "./match.js";
 import safetyRouter from "./safety.js";
 import searchRouter from "./search.js";
+import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(chatRouter);
 router.use(matchRouter);
 router.use(safetyRouter);
 router.use(searchRouter);
+router.use(storageRouter);
 
 export default router;

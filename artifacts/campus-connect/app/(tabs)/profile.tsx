@@ -28,6 +28,23 @@ const INTERESTS = [
   "Music", "Sports", "Art", "Tech", "Gaming", "Travel",
   "Food", "Books", "Movies", "Dance", "Fitness", "Photography",
   "Fashion", "Politics", "Memes",
+  "Cricket", "Football", "Basketball", "Badminton", "Tennis",
+  "Yoga", "Cooking", "Baking", "Coffee", "Writing",
+  "Poetry", "Singing", "Theatre", "Painting", "Drawing",
+  "Coding", "AI/ML", "Startups", "Entrepreneurship", "Finance",
+  "Stock Market", "Crypto", "Cybersecurity", "Robotics", "3D Printing",
+  "Anime", "K-pop", "Bollywood", "Hip-Hop", "EDM",
+  "Rock Music", "Classical Music", "Jazz", "Podcasts", "Stand-up Comedy",
+  "Volunteering", "Environment", "Mental Health", "Feminism", "Social Justice",
+  "Animal Rights", "LGBTQ+", "Sustainability", "Minimalism", "Veganism",
+  "Street Food", "Nutrition", "Skincare", "Thrifting", "DIY",
+  "Journaling", "Meditation", "Astrology", "Tarot", "Board Games",
+  "Chess", "Puzzles", "Gardening", "Camping", "Hiking",
+  "Trekking", "Cycling", "Running", "Swimming", "Gym",
+  "Web Series", "Netflix", "Esports", "VR/AR", "Digital Art",
+  "Graphic Design", "Animation", "UI/UX", "Architecture", "Interior Design",
+  "Psychology", "Philosophy", "Journalism", "Debate", "Model UN",
+  "Night Photography", "Videography", "Filmmaking", "Skateboarding", "Street Art",
 ];
 
 export default function ProfileScreen() {
