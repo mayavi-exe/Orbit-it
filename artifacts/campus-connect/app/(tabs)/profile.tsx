@@ -125,6 +125,11 @@ export default function ProfileScreen() {
           <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? "?"}</Text>
         </View>
         <Text style={[styles.name, { color: colors.foreground }]}>{user?.name ?? "User"}</Text>
+        {user?.username && (
+          <View style={[styles.usernameBadge, { backgroundColor: colors.primary + "15" }]}>
+            <Text style={[styles.usernameText, { color: colors.primary }]}>@{user.username}</Text>
+          </View>
+        )}
         <Text style={[styles.email, { color: colors.mutedForeground }]}>{user?.email ?? ""}</Text>
         {user?.college && (
           <View style={[styles.collegeBadge, { backgroundColor: colors.secondary }]}>
@@ -218,6 +223,8 @@ const styles = StyleSheet.create({
   avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   avatarText: { color: "#fff", fontSize: 36, fontWeight: "bold" },
   name: { fontSize: 24, fontWeight: "bold" },
+  usernameBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
+  usernameText: { fontSize: 16, fontWeight: "700" },
   email: { fontSize: 14 },
   collegeBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   collegeText: { fontSize: 13, fontWeight: "600" },

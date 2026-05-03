@@ -53,7 +53,6 @@ function mapFullProfile(user: typeof usersTable.$inferSelect, college: typeof co
 
 const updateProfileSchema = z.object({
   name: z.string().min(2).optional(),
-  username: z.string().min(2).optional(),
   bio: z.string().max(300).optional(),
   gender: z.enum(["MALE", "FEMALE", "NON_BINARY", "PREFER_NOT_TO_SAY"]).optional(),
   age: z.number().int().min(16).max(100).optional(),

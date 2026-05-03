@@ -68,6 +68,10 @@ A college-based community and dating app for Mumbai college students. Full-stack
 - POST `/api/admin/action` — Admin: take moderation action (BAN/DELETE/WARN/DISMISS)
 - GET `/api/admin/users` — Admin: list users with flags
 
+### Search (`/api/search`)
+- GET `/api/search/users?q=&limit=` — Search users by name or username (ILIKE, auth required)
+- GET `/api/search/posts?q=&limit=` — Search posts by content (ILIKE, sorted by likes, auth required)
+
 ## Database Schema (PostgreSQL / Drizzle ORM)
 
 Tables: `colleges`, `users`, `posts`, `comments`, `likes`, `conversations`, `messages`, `swipes`, `matches`, `reports`, `blocks`, `moderation_logs`, `admins`
@@ -79,6 +83,23 @@ Tables: `colleges`, `users`, `posts`, `comments`, `likes`, `conversations`, `mes
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/scripts run seed-colleges` — seed Mumbai colleges into DB
+
+## Usernames
+
+- **Auto-generated on registration** from the user's name: `firstname.lastname` → e.g. `rahul.sharma`. Collisions resolved by appending a random 4-digit suffix (up to 10 attempts, then timestamp fallback).
+- **Immutable once set** — removed from `updateProfileSchema` so PATCH `/api/users/me/profile` cannot change it.
+- **Optional custom username during registration** — the register endpoint accepts an optional `username` field. If provided, it's validated for uniqueness; if omitted, one is auto-generated.
+- **Format**: lowercase alphanumeric, dots, underscores only. Max 30 chars.
+- **Displayed** with `@` prefix throughout the app (profile header, discover cards, chat list, search results).
+
+## Mobile App Screens
+
+- **Login** — Email + password login
+- **Register** — Name, auto-suggested `@username` (editable, shown with `@` prefix and immutability warning), email, password, college picker
+- **Feed (Home tab)** — College feed with like/comment, Create Post modal
+- **Discover tab** — Swipe cards + List mode for recommendations; top search bar switches to Search mode with People/Posts sub-tabs, shows user cards with `@username` and "Message" button, post cards with author info
+- **Chat tab** — Conversations list with `@username` display; top search bar finds users by name/username to start new conversations
+- **Profile tab** — Avatar, full name, `@username` badge (prominent, primary color), email, college, stats, bio + interests editing
 
 ## Colleges Pre-seeded
 

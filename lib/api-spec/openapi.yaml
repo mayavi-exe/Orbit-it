@@ -710,6 +710,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  # --- SEARCH ---
+  /search/users:
+    get:
+      operationId: searchUsers
+      tags: [users]
+      summary: Search users by name or username
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: User search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchUsersResponse"
+
+  /search/posts:
+    get:
+      operationId: searchPosts
+      tags: [posts]
+      summary: Search posts by content
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Post search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchPostsResponse"
+
   /admin/users:
     get:
       operationId: getAdminUsers
@@ -790,6 +845,11 @@ components:
           minLength: 8
         collegeId:
           type: string
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          description: Optional. Auto-generated from name if not provided. Cannot be changed later.
       required:
         - name
         - email
@@ -1411,6 +1471,26 @@ components:
         - reason
         - status
         - createdAt
+
+    SearchUsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicUserProfile"
+      required:
+        - users
+
+    SearchPostsResponse:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+      required:
+        - posts
 
     # --- ADMIN SCHEMAS ---
     AdminActionType:

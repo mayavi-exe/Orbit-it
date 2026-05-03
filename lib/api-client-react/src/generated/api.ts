@@ -51,6 +51,10 @@ import type {
   RefreshRequest,
   RegisterRequest,
   ReportRequest,
+  SearchPostsParams,
+  SearchPostsResponse,
+  SearchUsersParams,
+  SearchUsersResponse,
   SendMessageRequest,
   StartConversationRequest,
   SuccessResponse,
@@ -2687,6 +2691,194 @@ export const useAdminAction = <
 > => {
   return useMutation(getAdminActionMutationOptions(options));
 };
+
+/**
+ * @summary Search users by name or username
+ */
+export const getSearchUsersUrl = (params: SearchUsersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/search/users?${stringifiedParams}`
+    : `/api/search/users`;
+};
+
+export const searchUsers = async (
+  params: SearchUsersParams,
+  options?: RequestInit,
+): Promise<SearchUsersResponse> => {
+  return customFetch<SearchUsersResponse>(getSearchUsersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSearchUsersQueryKey = (params?: SearchUsersParams) => {
+  return [`/api/search/users`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchUsersQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchUsers>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSearchUsersQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchUsers>>> = ({
+    signal,
+  }) => searchUsers(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchUsers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchUsersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchUsers>>
+>;
+export type SearchUsersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Search users by name or username
+ */
+
+export function useSearchUsers<
+  TData = Awaited<ReturnType<typeof searchUsers>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchUsersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Search posts by content
+ */
+export const getSearchPostsUrl = (params: SearchPostsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/search/posts?${stringifiedParams}`
+    : `/api/search/posts`;
+};
+
+export const searchPosts = async (
+  params: SearchPostsParams,
+  options?: RequestInit,
+): Promise<SearchPostsResponse> => {
+  return customFetch<SearchPostsResponse>(getSearchPostsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSearchPostsQueryKey = (params?: SearchPostsParams) => {
+  return [`/api/search/posts`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchPostsQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSearchPostsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchPosts>>> = ({
+    signal,
+  }) => searchPosts(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchPosts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchPostsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchPosts>>
+>;
+export type SearchPostsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Search posts by content
+ */
+
+export function useSearchPosts<
+  TData = Awaited<ReturnType<typeof searchPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchPostsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get all users with flags (admin only)

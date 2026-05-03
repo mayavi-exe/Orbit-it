@@ -6,6 +6,7 @@ import postsRouter from "./posts.js";
 import chatRouter from "./chat.js";
 import matchRouter from "./match.js";
 import safetyRouter from "./safety.js";
+import searchRouter from "./search.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(postsRouter);
 router.use(chatRouter);
 router.use(matchRouter);
 router.use(safetyRouter);
+router.use(searchRouter);
 
 export default router;

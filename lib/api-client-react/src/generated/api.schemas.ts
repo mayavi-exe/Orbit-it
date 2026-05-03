@@ -26,6 +26,12 @@ export interface RegisterRequest {
   /** @minLength 8 */
   password: string;
   collegeId: string;
+  /**
+   * Optional. Auto-generated from name if not provided. Cannot be changed later.
+   * @minLength 3
+   * @maxLength 30
+   */
+  username?: string;
 }
 
 export interface LoginRequest {
@@ -320,6 +326,14 @@ export interface Report {
   createdAt: string;
 }
 
+export interface SearchUsersResponse {
+  users: PublicUserProfile[];
+}
+
+export interface SearchPostsResponse {
+  posts: Post[];
+}
+
 export type AdminActionType =
   (typeof AdminActionType)[keyof typeof AdminActionType];
 
@@ -392,6 +406,22 @@ export type GetAdminReportsParams = {
 
 export type GetAdminReports200 = {
   reports: Report[];
+};
+
+export type SearchUsersParams = {
+  /**
+   * @minLength 1
+   */
+  q: string;
+  limit?: number;
+};
+
+export type SearchPostsParams = {
+  /**
+   * @minLength 1
+   */
+  q: string;
+  limit?: number;
 };
 
 export type GetAdminUsersParams = {
