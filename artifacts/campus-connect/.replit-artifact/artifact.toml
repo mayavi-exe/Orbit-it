@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Campus Connect"
+version = "1.0.0"
+id = "artifacts/campus-connect"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 21619
+
+[services.development]
+run = "pnpm --filter @workspace/campus-connect run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/campus-connect", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/campus-connect", "run", "serve" ]
+
+[services.env]
+PORT = "21619"
+BASE_PATH = "/"

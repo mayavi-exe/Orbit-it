@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Campus Connect API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User profile operations
+  - name: posts
+    description: Community feed operations
+  - name: chat
+    description: Messaging operations
+  - name: match
+    description: Matching and discovery operations
+  - name: safety
+    description: Safety and moderation operations
+  - name: admin
+    description: Admin operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +38,712 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # --- AUTH ---
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # --- USERS ---
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get my profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/me/profile:
+    patch:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update my profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/{userId}:
+    get:
+      operationId: getUserById
+      tags: [users]
+      summary: Get a user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User profile (privacy filtered)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUserProfile"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/stats:
+    get:
+      operationId: getUserStats
+      tags: [users]
+      summary: Get current user stats (posts, matches, likes received)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  # --- COLLEGES ---
+  /colleges:
+    get:
+      operationId: getColleges
+      tags: [users]
+      summary: List all supported colleges
+      responses:
+        "200":
+          description: List of colleges
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  colleges:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/College"
+                required:
+                  - colleges
+
+  # --- POSTS / FEED ---
+  /posts:
+    post:
+      operationId: createPost
+      tags: [posts]
+      summary: Create a new post
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/feed:
+    get:
+      operationId: getFeed
+      tags: [posts]
+      summary: Get paginated college feed
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: postType
+          in: query
+          schema:
+            $ref: "#/components/schemas/PostType"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Feed posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedResponse"
+
+  /posts/trending:
+    get:
+      operationId: getTrendingPosts
+      tags: [posts]
+      summary: Get trending posts in the college
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Trending posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedResponse"
+
+  /posts/{postId}:
+    get:
+      operationId: getPost
+      tags: [posts]
+      summary: Get a single post
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{postId}/like:
+    post:
+      operationId: toggleLike
+      tags: [posts]
+      summary: Like or unlike a post
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Like toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+
+  /posts/{postId}/comments:
+    get:
+      operationId: getComments
+      tags: [posts]
+      summary: Get comments for a post
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentsResponse"
+    post:
+      operationId: addComment
+      tags: [posts]
+      summary: Add a comment to a post
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCommentRequest"
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  # --- CHAT ---
+  /chat/conversations:
+    get:
+      operationId: getConversations
+      tags: [chat]
+      summary: Get all conversations
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Conversations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Conversation"
+                required:
+                  - conversations
+
+  /chat/start:
+    post:
+      operationId: startConversation
+      tags: [chat]
+      summary: Start or get a conversation with a user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartConversationRequest"
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /chat/{conversationId}/messages:
+    get:
+      operationId: getMessages
+      tags: [chat]
+      summary: Get messages in a conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagesResponse"
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send a message
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  # --- MATCH ---
+  /match/recommendations:
+    get:
+      operationId: getRecommendations
+      tags: [match]
+      summary: Get match recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Recommended users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RecommendedUser"
+                required:
+                  - recommendations
+
+  /match/swipe:
+    post:
+      operationId: swipe
+      tags: [match]
+      summary: Swipe on a user (like or pass)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwipeRequest"
+      responses:
+        "200":
+          description: Swipe result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwipeResponse"
+
+  /match:
+    get:
+      operationId: getMatches
+      tags: [match]
+      summary: Get all matches
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Matches
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Match"
+                required:
+                  - matches
+
+  /match/stats:
+    get:
+      operationId: getMatchStats
+      tags: [match]
+      summary: Get matching stats (total matches, pending likes, etc.)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Match stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchStats"
+
+  # --- SAFETY ---
+  /report:
+    post:
+      operationId: submitReport
+      tags: [safety]
+      summary: Report a user, post, or message
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "201":
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /block:
+    post:
+      operationId: blockUser
+      tags: [safety]
+      summary: Block a user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockRequest"
+      responses:
+        "200":
+          description: User blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /block/{userId}:
+    delete:
+      operationId: unblockUser
+      tags: [safety]
+      summary: Unblock a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User unblocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /block/list:
+    get:
+      operationId: getBlockedUsers
+      tags: [safety]
+      summary: Get list of blocked users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Blocked users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blocked:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicUserProfile"
+                required:
+                  - blocked
+
+  # --- ADMIN ---
+  /admin/reports:
+    get:
+      operationId: getAdminReports
+      tags: [admin]
+      summary: Get all reports (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ReportStatus"
+      responses:
+        "200":
+          description: Reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Report"
+                required:
+                  - reports
+
+  /admin/action:
+    post:
+      operationId: adminAction
+      tags: [admin]
+      summary: Take moderation action (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminActionRequest"
+      responses:
+        "200":
+          description: Action taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/users:
+    get:
+      operationId: getAdminUsers
+      tags: [admin]
+      summary: Get all users with flags (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flagged
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUserView"
+                required:
+                  - users
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +753,712 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    # --- AUTH SCHEMAS ---
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        collegeId:
+          type: string
+      required:
+        - name
+        - email
+        - password
+        - collegeId
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - accessToken
+        - refreshToken
+        - user
+
+    # --- USER SCHEMAS ---
+    Gender:
+      type: string
+      enum: [MALE, FEMALE, NON_BINARY, PREFER_NOT_TO_SAY]
+
+    VerificationStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+          nullable: true
+        email:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        gender:
+          $ref: "#/components/schemas/Gender"
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        profilePhotos:
+          type: array
+          items:
+            type: string
+        collegeId:
+          type: string
+        college:
+          $ref: "#/components/schemas/College"
+          nullable: true
+        interests:
+          type: array
+          items:
+            type: string
+        clubs:
+          type: array
+          items:
+            type: string
+        isEmailVerified:
+          type: boolean
+        verificationStatus:
+          $ref: "#/components/schemas/VerificationStatus"
+        isProfilePublic:
+          type: boolean
+        showAge:
+          type: boolean
+        showGender:
+          type: boolean
+        profileCompleted:
+          type: boolean
+        isActive:
+          type: boolean
+        lastActiveAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - profilePhotos
+        - collegeId
+        - interests
+        - clubs
+        - isEmailVerified
+        - verificationStatus
+        - isProfilePublic
+        - showAge
+        - showGender
+        - profileCompleted
+        - isActive
+        - createdAt
+
+    PublicUserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        gender:
+          $ref: "#/components/schemas/Gender"
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        profilePhotos:
+          type: array
+          items:
+            type: string
+        collegeId:
+          type: string
+        college:
+          $ref: "#/components/schemas/College"
+          nullable: true
+        interests:
+          type: array
+          items:
+            type: string
+        clubs:
+          type: array
+          items:
+            type: string
+        isEmailVerified:
+          type: boolean
+        profileCompleted:
+          type: boolean
+      required:
+        - id
+        - name
+        - profilePhotos
+        - collegeId
+        - interests
+        - clubs
+        - isEmailVerified
+        - profileCompleted
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        bio:
+          type: string
+        gender:
+          $ref: "#/components/schemas/Gender"
+        age:
+          type: integer
+        interests:
+          type: array
+          items:
+            type: string
+        clubs:
+          type: array
+          items:
+            type: string
+        profilePhotos:
+          type: array
+          items:
+            type: string
+        isProfilePublic:
+          type: boolean
+        showAge:
+          type: boolean
+        showGender:
+          type: boolean
+
+    UserStats:
+      type: object
+      properties:
+        postsCount:
+          type: integer
+        matchesCount:
+          type: integer
+        likesReceived:
+          type: integer
+        commentsReceived:
+          type: integer
+      required:
+        - postsCount
+        - matchesCount
+        - likesReceived
+        - commentsReceived
+
+    College:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        domain:
+          type: string
+        location:
+          type: string
+      required:
+        - id
+        - name
+        - domain
+        - location
+
+    # --- POST SCHEMAS ---
+    PostType:
+      type: string
+      enum: [TEXT, IMAGE, CONFESSION, EVENT]
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+        authorId:
+          type: string
+          nullable: true
+        author:
+          $ref: "#/components/schemas/PublicUserProfile"
+          nullable: true
+        collegeId:
+          type: string
+        content:
+          type: string
+          nullable: true
+        mediaUrls:
+          type: array
+          items:
+            type: string
+        postType:
+          $ref: "#/components/schemas/PostType"
+        isAnonymous:
+          type: boolean
+        likesCount:
+          type: integer
+        commentsCount:
+          type: integer
+        isLiked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - collegeId
+        - mediaUrls
+        - postType
+        - isAnonymous
+        - likesCount
+        - commentsCount
+        - isLiked
+        - createdAt
+        - updatedAt
+
+    CreatePostRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        mediaUrls:
+          type: array
+          items:
+            type: string
+        postType:
+          $ref: "#/components/schemas/PostType"
+        isAnonymous:
+          type: boolean
+          default: false
+      required:
+        - postType
+
+    FeedResponse:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - posts
+
+    LikeResponse:
+      type: object
+      properties:
+        liked:
+          type: boolean
+        likesCount:
+          type: integer
+      required:
+        - liked
+        - likesCount
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        postId:
+          type: string
+        authorId:
+          type: string
+        author:
+          $ref: "#/components/schemas/PublicUserProfile"
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - postId
+        - authorId
+        - author
+        - content
+        - createdAt
+
+    AddCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+      required:
+        - content
+
+    CommentsResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - comments
+
+    # --- CHAT SCHEMAS ---
+    MessageStatus:
+      type: string
+      enum: [SENT, DELIVERED, READ]
+
+    MessageType:
+      type: string
+      enum: [TEXT, IMAGE]
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+        receiverId:
+          type: string
+        content:
+          type: string
+          nullable: true
+        mediaUrl:
+          type: string
+          nullable: true
+        messageType:
+          $ref: "#/components/schemas/MessageType"
+        status:
+          $ref: "#/components/schemas/MessageStatus"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - senderId
+        - receiverId
+        - messageType
+        - status
+        - createdAt
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+        otherUser:
+          $ref: "#/components/schemas/PublicUserProfile"
+        lastMessage:
+          type: string
+          nullable: true
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+        unreadCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - otherUser
+        - unreadCount
+        - createdAt
+
+    StartConversationRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId
+
+    SendMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        mediaUrl:
+          type: string
+        messageType:
+          $ref: "#/components/schemas/MessageType"
+      required:
+        - messageType
+
+    MessagesResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - messages
+
+    # --- MATCH SCHEMAS ---
+    RecommendedUser:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/PublicUserProfile"
+        compatibilityScore:
+          type: number
+        commonInterests:
+          type: array
+          items:
+            type: string
+      required:
+        - user
+        - compatibilityScore
+        - commonInterests
+
+    SwipeAction:
+      type: string
+      enum: [LIKE, PASS]
+
+    SwipeRequest:
+      type: object
+      properties:
+        toUserId:
+          type: string
+        action:
+          $ref: "#/components/schemas/SwipeAction"
+      required:
+        - toUserId
+        - action
+
+    SwipeResponse:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        matchId:
+          type: string
+          nullable: true
+      required:
+        - matched
+
+    Match:
+      type: object
+      properties:
+        id:
+          type: string
+        otherUser:
+          $ref: "#/components/schemas/PublicUserProfile"
+        compatibilityScore:
+          type: number
+        matchedAt:
+          type: string
+          format: date-time
+        conversationId:
+          type: string
+          nullable: true
+      required:
+        - id
+        - otherUser
+        - compatibilityScore
+        - matchedAt
+
+    MatchStats:
+      type: object
+      properties:
+        totalMatches:
+          type: integer
+        pendingLikes:
+          type: integer
+        profileViews:
+          type: integer
+      required:
+        - totalMatches
+        - pendingLikes
+        - profileViews
+
+    # --- SAFETY SCHEMAS ---
+    ReportReason:
+      type: string
+      enum: [SPAM, ABUSE, HARASSMENT, FAKE_PROFILE, NSFW, OTHER]
+
+    ReportStatus:
+      type: string
+      enum: [PENDING, REVIEWED, ACTION_TAKEN]
+
+    ReportRequest:
+      type: object
+      properties:
+        targetUserId:
+          type: string
+        targetPostId:
+          type: string
+        targetMessageId:
+          type: string
+        reason:
+          $ref: "#/components/schemas/ReportReason"
+        description:
+          type: string
+      required:
+        - reason
+
+    BlockRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+        reporterId:
+          type: string
+        targetUserId:
+          type: string
+          nullable: true
+        targetPostId:
+          type: string
+          nullable: true
+        reason:
+          $ref: "#/components/schemas/ReportReason"
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - reporterId
+        - reason
+        - status
+        - createdAt
+
+    # --- ADMIN SCHEMAS ---
+    AdminActionType:
+      type: string
+      enum: [BAN_USER, DELETE_POST, WARN_USER, DISMISS]
+
+    AdminActionRequest:
+      type: object
+      properties:
+        reportId:
+          type: string
+        actionType:
+          $ref: "#/components/schemas/AdminActionType"
+        notes:
+          type: string
+      required:
+        - reportId
+        - actionType
+
+    AdminUserView:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        collegeId:
+          type: string
+        college:
+          $ref: "#/components/schemas/College"
+          nullable: true
+        isActive:
+          type: boolean
+        isBanned:
+          type: boolean
+        reportCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - collegeId
+        - isActive
+        - isBanned
+        - reportCount
+        - createdAt

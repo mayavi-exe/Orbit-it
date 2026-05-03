@@ -1,0 +1,190 @@
+Extend the backend to implement a **production-grade Community Feed system** for a college-based private social and dating app using Node.js, Express, MongoDB (Mongoose), and TypeScript.
+
+## 🎯 Goal
+
+Build a scalable, high-performance feed system that:
+
+* Drives daily engagement
+* Supports multiple content types
+* Works efficiently at scale (10K–100K users)
+
+---
+
+## 🧱 Core Models (Mongoose)
+
+### 1. Post Model
+
+Fields:
+
+* authorId (ObjectId, ref User)
+* collegeId (ObjectId, ref College)
+* content (string, optional for text posts)
+* mediaUrls (array of strings for images)
+* postType (enum: TEXT, IMAGE, CONFESSION, EVENT)
+* isAnonymous (boolean)
+* likesCount (number, default 0)
+* commentsCount (number, default 0)
+* createdAt
+* updatedAt
+
+---
+
+### 2. Comment Model
+
+Fields:
+
+* postId (ObjectId)
+* authorId (ObjectId)
+* content (string)
+* createdAt
+
+---
+
+### 3. Like Model
+
+Fields:
+
+* userId
+* postId
+* createdAt
+
+(Ensure unique compound index: userId + postId)
+
+---
+
+## 📊 Indexing (CRITICAL FOR PERFORMANCE)
+
+* index on collegeId + createdAt (feed query)
+* index on authorId
+* index on postType
+
+---
+
+## 📡 Feed APIs
+
+### 1. Create Post
+
+POST /api/posts
+
+* Create text/image/confession post
+* Validate input
+* Attach user collegeId automatically
+
+---
+
+### 2. Get Feed (Paginated)
+
+GET /api/posts/feed
+
+Features:
+
+* Cursor-based pagination (NOT skip/limit)
+* Filter by:
+
+  * collegeId (mandatory)
+  * postType (optional)
+* Sort by latest (initially)
+
+---
+
+### 3. Like / Unlike Post
+
+POST /api/posts/:id/like
+
+* Toggle like
+* Update likesCount atomically
+
+---
+
+### 4. Comment on Post
+
+POST /api/posts/:id/comment
+
+* Add comment
+* Increment commentsCount
+
+---
+
+### 5. Get Post Comments
+
+GET /api/posts/:id/comments
+
+* Paginated comments
+
+---
+
+## 🧠 Feed Optimization (IMPORTANT)
+
+* Use lean queries in Mongoose
+* Return minimal fields
+* Populate only required user info (name, photo)
+
+---
+
+## ⚡ Caching Strategy
+
+* Use Redis to cache:
+
+  * Feed (short TTL)
+  * Popular posts
+
+---
+
+## 🛡️ Moderation Hooks
+
+Before saving post:
+
+* Pass content through moderation service
+* Block or flag:
+
+  * Abuse
+  * Spam
+  * NSFW content
+
+---
+
+## 🔐 Privacy Rules
+
+* Only show posts from same college
+* Hide anonymous author identity
+* Respect blocked users
+
+---
+
+## 🧪 Edge Cases
+
+Handle:
+
+* Duplicate likes
+* Empty posts
+* Large media uploads
+* Deleted users
+
+---
+
+## 📦 Service Layer
+
+* post.service.ts
+* comment.service.ts
+* like.service.ts
+
+---
+
+## 🧪 Testing
+
+* Test post creation
+* Test feed pagination
+* Test like toggle
+
+---
+
+## 🚀 Deliverables
+
+* Fully working feed APIs
+* Optimized queries
+* Scalable pagination
+* Clean modular code
+
+---
+
+Design the feed system to handle **high traffic and future ranking algorithms (AI feed ranking)**.

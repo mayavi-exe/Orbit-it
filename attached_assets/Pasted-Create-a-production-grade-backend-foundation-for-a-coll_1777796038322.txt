@@ -1,0 +1,142 @@
+Create a **production-grade backend foundation** for a college-based community and dating app using Node.js, Express, MongoDB, and TypeScript.
+
+## 🎯 Goal
+
+Set up a scalable, clean, and modular backend architecture that will support:
+
+* Authentication
+* User profiles
+* Community feed
+* Chat system (later)
+* Matching system (later)
+
+---
+
+## ⚙️ Tech Requirements
+
+* Node.js + Express
+* TypeScript (strict mode)
+* MongoDB (Mongoose)
+* JWT Authentication
+* Environment-based config (.env)
+
+---
+
+## 📁 Folder Structure (Clean Architecture)
+
+Follow a modular and scalable structure:
+
+* src/
+
+  * config/
+  * controllers/
+  * services/
+  * models/
+  * routes/
+  * middlewares/
+  * utils/
+  * types/
+  * modules/ (feature-based structure)
+* tests/
+* .env
+* app.ts
+* server.ts
+
+---
+
+## 🔐 Authentication System
+
+Implement:
+
+* User registration
+* Login
+* JWT (access + refresh tokens)
+* Password hashing using bcrypt
+
+---
+
+## 🧱 Core Models (Initial)
+
+Create Mongoose schemas for:
+
+1. User
+
+   * name
+   * email (college email required)
+   * password
+   * collegeId
+   * isVerified
+   * profileCompleted
+   * createdAt
+
+2. College
+
+   * name
+   * domain (e.g., nmims.edu)
+   * location
+
+---
+
+## 🛡️ Middlewares
+
+* Auth middleware (JWT verification)
+* Error handling middleware (global)
+* Request validation (Zod or Joi)
+* Rate limiter
+
+---
+
+## 📡 API Structure
+
+Create REST APIs:
+
+### Auth:
+
+* POST /api/auth/register
+* POST /api/auth/login
+* POST /api/auth/refresh
+
+### User:
+
+* GET /api/users/me
+* PATCH /api/users/update-profile
+
+---
+
+## 🔒 Security Best Practices
+
+* Use Helmet.js
+* Use CORS properly
+* Sanitize inputs
+* Hash passwords
+* Store secrets in .env
+
+---
+
+## 📦 Additional Setup
+
+* Logger (Winston or Pino)
+* ESLint + Prettier
+* tsconfig setup
+* Environment config loader
+
+---
+
+## 🧪 Basic Testing Setup
+
+* Jest setup
+* One sample test for auth
+
+---
+
+## 🚀 Deliverables
+
+* Fully working backend boilerplate
+* Clean folder structure
+* Auth APIs working
+* MongoDB connection setup
+* Ready for next feature modules
+
+---
+
+Write clean, modular, production-ready code with proper separation of concerns.

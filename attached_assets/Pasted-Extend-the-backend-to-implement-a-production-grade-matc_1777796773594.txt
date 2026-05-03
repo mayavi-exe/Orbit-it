@@ -1,0 +1,218 @@
+Extend the backend to implement a **production-grade matching system** combining swipe-based interactions and interest-based recommendations for a college-based community and dating app.
+
+## 🎯 Goal
+
+Build a hybrid matching system that:
+
+* Prioritizes meaningful connections (interest-based)
+* Supports swipe interactions (for engagement)
+* Scales efficiently for thousands of users
+
+---
+
+## 🧱 Core Models (Mongoose)
+
+### 1. MatchPreference Model
+
+Fields:
+
+* userId (ObjectId)
+* preferredGender (array)
+* ageRange (min, max)
+* maxDistance (optional future)
+* interestsWeight (number)
+* activityWeight (number)
+* createdAt
+
+---
+
+### 2. Swipe Model
+
+Fields:
+
+* fromUserId
+* toUserId
+* action (enum: LIKE, PASS)
+* createdAt
+
+(Unique index: fromUserId + toUserId)
+
+---
+
+### 3. Match Model
+
+Fields:
+
+* user1
+* user2
+* matchedAt
+* compatibilityScore
+* isActive (boolean)
+
+(Ensure unique pair constraint)
+
+---
+
+## 📊 Indexing (IMPORTANT)
+
+* index on interests (User)
+* index on collegeId
+* index on lastActiveAt
+* index on Swipe (fromUserId, toUserId unique)
+
+---
+
+## 📡 APIs
+
+### 1. Get Recommendations
+
+GET /api/match/recommendations
+
+Return:
+
+* List of users ranked by compatibility score
+
+Filters:
+
+* Same college
+* Not already swiped
+* Respect preferences
+
+---
+
+### 2. Swipe Action
+
+POST /api/match/swipe
+
+Body:
+
+* toUserId
+* action (LIKE or PASS)
+
+Logic:
+
+* Store swipe
+* If mutual LIKE → create Match
+
+---
+
+### 3. Get Matches
+
+GET /api/match
+
+* Return all matched users
+* Include last interaction
+
+---
+
+## 🧠 Matching Algorithm (CORE)
+
+### Step 1: Candidate Filtering
+
+* Same college
+* Active users (lastActiveAt recent)
+* Not blocked
+* Not already swiped
+
+---
+
+### Step 2: Scoring Function
+
+Score based on:
+
+1. Interest Overlap (HIGH WEIGHT)
+
+* Common interests count
+* Jaccard similarity
+
+2. Activity Level
+
+* Recently active users ranked higher
+
+3. Profile Completion
+
+* Completed profiles boosted
+
+4. Mutual Connections (future)
+
+---
+
+### Example Score:
+
+score =
+(interestScore * 0.5) +
+(activityScore * 0.2) +
+(profileScore * 0.2) +
+(randomness * 0.1)
+
+---
+
+### Step 3: Ranking
+
+* Sort by score descending
+* Return top N users
+
+---
+
+## 🔁 Swipe Layer (UI Support)
+
+* Provide next recommendation one-by-one
+* Maintain swipe queue (cached)
+
+---
+
+## ⚡ Performance Optimization
+
+* Precompute recommendations (cron job)
+* Cache in Redis
+* Avoid real-time heavy computation
+
+---
+
+## 🛡️ Safety Rules
+
+* Respect blocked users
+* Gender preference filtering
+* Age constraints
+* Prevent spam swiping (rate limit)
+
+---
+
+## 🧪 Edge Cases
+
+Handle:
+
+* Self matching
+* Duplicate matches
+* Rapid swiping abuse
+* Empty recommendation pool
+
+---
+
+## 📦 Service Layer
+
+* match.service.ts
+* swipe.service.ts
+* recommendation.engine.ts
+
+---
+
+## 🧪 Testing
+
+* Test compatibility scoring
+* Test match creation
+* Test recommendation filtering
+
+---
+
+## 🚀 Deliverables
+
+* Recommendation engine
+* Swipe system
+* Match creation logic
+* Optimized queries
+* Scalable architecture
+
+---
+
+Design the system to evolve into an **AI-powered matchmaking engine in the future**.

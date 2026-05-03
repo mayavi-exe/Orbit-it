@@ -1,0 +1,239 @@
+Extend the backend to implement a **production-grade Safety, Moderation, and Admin system** for a college-based community and dating app using Node.js, Express, MongoDB (Mongoose), and TypeScript.
+
+## 🎯 Goal
+
+Build a robust trust & safety system that:
+
+* Prevents abuse, harassment, and spam
+* Enables fast moderation actions
+* Scales with user growth
+* Protects user privacy and platform integrity
+
+---
+
+## 🧱 Core Models (Mongoose)
+
+### 1. Report Model
+
+Fields:
+
+* reporterId (ObjectId, ref User)
+* targetUserId (optional)
+* targetPostId (optional)
+* targetMessageId (optional)
+* reason (enum: SPAM, ABUSE, HARASSMENT, FAKE_PROFILE, NSFW)
+* description (string)
+* status (enum: PENDING, REVIEWED, ACTION_TAKEN)
+* createdAt
+* reviewedAt
+
+---
+
+### 2. Block Model
+
+Fields:
+
+* blockerId
+* blockedUserId
+* createdAt
+
+(Unique index: blockerId + blockedUserId)
+
+---
+
+### 3. ModerationLog Model
+
+Fields:
+
+* adminId
+* action (BAN_USER, DELETE_POST, WARNING)
+* targetId
+* reason
+* createdAt
+
+---
+
+### 4. Admin Model
+
+Fields:
+
+* userId
+* role (SUPER_ADMIN, MODERATOR)
+* permissions (array)
+
+---
+
+## 📡 APIs
+
+### User Safety APIs:
+
+#### 1. Report User/Post/Message
+
+POST /api/report
+
+* Submit report with reason + optional description
+
+---
+
+#### 2. Block User
+
+POST /api/block
+
+* Prevent interaction (chat, match, feed visibility)
+
+---
+
+#### 3. Unblock User
+
+DELETE /api/block/:userId
+
+---
+
+## 🛡️ Enforcement Logic (CRITICAL)
+
+### Blocking:
+
+* Blocked users:
+
+  * Cannot chat
+  * Cannot see each other in feed
+  * Cannot match
+
+---
+
+### Reporting Flow:
+
+1. User submits report
+2. Report stored as PENDING
+3. Admin reviews
+4. Action taken:
+
+   * Warning
+   * Content removal
+   * Temporary ban
+   * Permanent ban
+
+---
+
+## 🤖 AI MODERATION LAYER
+
+Integrate moderation checks before saving content:
+
+### For Posts & Messages:
+
+* Detect:
+
+  * Abuse
+  * Hate speech
+  * NSFW content
+  * Spam
+
+### Actions:
+
+* Auto-block (severe cases)
+* Flag for review
+* Allow (safe content)
+
+---
+
+## 🧠 Moderation Strategy
+
+* Combine:
+
+  * AI moderation (fast)
+  * Human moderation (accurate)
+
+---
+
+## 🖥️ Admin Dashboard APIs
+
+### 1. Get Reports
+
+GET /api/admin/reports
+
+* Filter by:
+
+  * status
+  * type
+  * date
+
+---
+
+### 2. Take Action
+
+POST /api/admin/action
+
+Body:
+
+* reportId
+* actionType (BAN_USER, DELETE_POST, WARN)
+* notes
+
+---
+
+### 3. Get Users
+
+GET /api/admin/users
+
+* View flagged users
+* See report history
+
+---
+
+## 🔐 Role-Based Access Control (RBAC)
+
+* Only admins can:
+
+  * View reports
+  * Take moderation actions
+
+---
+
+## ⚡ Performance & Scaling
+
+* Index reports by status
+* Queue moderation tasks (Redis queue optional)
+* Batch processing for AI moderation
+
+---
+
+## 🧪 Edge Cases
+
+Handle:
+
+* False reports
+* Mass reporting abuse
+* Repeated offenders
+* Appeal system (future)
+
+---
+
+## 🔔 Notifications
+
+* Notify users when:
+
+  * Report submitted
+  * Action taken
+  * Warning issued
+
+---
+
+## 🧪 Testing
+
+* Test report creation
+* Test block logic
+* Test admin actions
+
+---
+
+## 🚀 Deliverables
+
+* Report system
+* Block/unblock system
+* Admin APIs
+* Moderation logic
+* Role-based access control
+
+---
+
+Design the system to ensure **maximum user safety, platform trust, and legal compliance**.

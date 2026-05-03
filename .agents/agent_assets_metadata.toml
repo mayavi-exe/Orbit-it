@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "N7FCPPVrgR_7e7IA2oNFF"
+uri = "file://artifacts/campus-connect/assets/images/icon.png"
+type = "image"
+title = "generated_image"

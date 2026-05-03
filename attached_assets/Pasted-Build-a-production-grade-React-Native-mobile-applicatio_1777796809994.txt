@@ -1,0 +1,212 @@
+Build a **production-grade React Native mobile application (Expo)** for a college-based community and dating app with a focus on clean UI, smooth UX, and high engagement.
+
+## 🎯 Goal
+
+Create a modern, fast, and intuitive mobile app that:
+
+* Feels premium and smooth
+* Drives daily engagement
+* Supports community + dating flows seamlessly
+
+---
+
+## ⚙️ Tech Stack
+
+* React Native (Expo)
+* TypeScript
+* State Management: Zustand (preferred) or Redux Toolkit
+* Navigation: React Navigation (Stack + Bottom Tabs)
+* Styling: NativeWind (Tailwind for React Native)
+* API Calls: Axios
+* Forms: React Hook Form + Zod
+
+---
+
+## 📱 App Navigation Structure
+
+### Bottom Tabs:
+
+1. Home (Feed)
+2. Discover (Matching)
+3. Chat
+4. Events
+5. Profile
+
+---
+
+## 🧭 Screen Flow
+
+### 1. 🔐 Auth Screens
+
+* Login Screen
+* Register Screen
+* Email Verification Screen
+* Profile Setup Screen (step-by-step onboarding)
+
+---
+
+### 2. 🏠 Home Feed Screen
+
+Features:
+
+* Infinite scroll feed
+* Post cards:
+
+  * User avatar
+  * Name / Anonymous tag
+  * Content (text/image)
+  * Like / Comment buttons
+* Floating “Create Post” button
+
+---
+
+### 3. ✍️ Create Post Screen
+
+* Text input
+* Image upload
+* Toggle: Anonymous / Public
+* Submit button
+
+---
+
+### 4. 🔍 Discover (Matching Screen)
+
+Two modes:
+
+1. Swipe Mode (cards UI)
+2. Smart List Mode (recommended users)
+
+User Card:
+
+* Photo
+* Name
+* Interests
+* Compatibility %
+
+Actions:
+
+* Like / Pass
+* View Profile
+
+---
+
+### 5. 💬 Chat Screens
+
+#### Chat List:
+
+* Conversations
+* Last message preview
+* Online indicator
+
+#### Chat Room:
+
+* Real-time messages
+* Message bubbles (left/right)
+* Input field + send button
+
+---
+
+### 6. 📅 Events Screen
+
+* List of campus events
+* Event cards:
+
+  * Title
+  * Date
+  * Participants
+* RSVP button
+
+---
+
+### 7. 👤 Profile Screen
+
+Sections:
+
+* Profile header (photo, name, college)
+* Bio
+* Interests tags
+* Edit profile button
+
+---
+
+### 8. ⚙️ Settings Screen
+
+* Privacy controls
+* Blocked users
+* Logout
+
+---
+
+## 🎨 UI/UX Design Guidelines
+
+* Minimal, clean layout
+* Smooth animations (React Native Reanimated)
+* Rounded cards, soft shadows
+* Dark mode support
+* Skeleton loaders (for loading states)
+
+---
+
+## ⚡ Performance Optimization
+
+* Lazy loading images
+* FlatList optimization
+* Memoized components
+* Avoid unnecessary re-renders
+
+---
+
+## 🔔 Notifications
+
+* Push notifications (Firebase)
+* In-app notification UI
+
+---
+
+## 🛡️ Safety UX
+
+* Report button on:
+
+  * Profiles
+  * Posts
+  * Chats
+* Block user option (visible in profile/chat)
+
+---
+
+## 🧪 Error Handling
+
+* Global error handler
+* Toast messages for:
+
+  * Success
+  * Errors
+  * Warnings
+
+---
+
+## 📦 Project Structure
+
+* src/
+
+  * components/
+  * screens/
+  * navigation/
+  * services/
+  * store/
+  * hooks/
+  * utils/
+  * assets/
+
+---
+
+## 🧪 Deliverables
+
+* Fully functional mobile UI
+* Connected to backend APIs
+* Smooth navigation
+* Clean reusable components
+
+---
+
+Design the app to feel like a **modern Gen-Z social platform, not a basic CRUD app**.

@@ -1,0 +1,184 @@
+Extend the backend to implement a **production-grade real-time chat system** for a college-based community and dating app using Node.js, Express, MongoDB (Mongoose), TypeScript, and Socket.io.
+
+## 🎯 Goal
+
+Build a reliable, scalable, and secure 1:1 messaging system with:
+
+* Real-time delivery
+* Message persistence
+* Read receipts
+* Offline support
+
+---
+
+## 🧱 Core Models (Mongoose)
+
+### 1. Conversation Model
+
+Fields:
+
+* participants (array of User IDs, size = 2)
+* lastMessage (string)
+* lastMessageAt (timestamp)
+* createdAt
+* updatedAt
+
+---
+
+### 2. Message Model
+
+Fields:
+
+* conversationId (ObjectId)
+* senderId (ObjectId)
+* receiverId (ObjectId)
+* content (string)
+* mediaUrl (optional)
+* messageType (enum: TEXT, IMAGE)
+* status (enum: SENT, DELIVERED, READ)
+* createdAt
+
+---
+
+## 📊 Indexing (CRITICAL)
+
+* index on conversationId + createdAt
+* index on senderId
+* index on receiverId
+
+---
+
+## 🔌 Socket.io Setup
+
+### Features:
+
+* User connection management
+* Room-based messaging (conversationId as room)
+* Emit events:
+
+  * send_message
+  * receive_message
+  * message_read
+  * user_online / user_offline
+
+---
+
+## 📡 Chat APIs (Fallback + History)
+
+### 1. Get Conversations
+
+GET /api/chat/conversations
+
+* List all user conversations
+* Sorted by lastMessageAt
+
+---
+
+### 2. Get Messages
+
+GET /api/chat/:conversationId/messages
+
+* Paginated (cursor-based)
+* Load chat history
+
+---
+
+### 3. Create / Get Conversation
+
+POST /api/chat/start
+
+* Create conversation if not exists
+* Ensure only 1 conversation per user pair
+
+---
+
+## ⚡ Real-Time Flow
+
+1. User connects → socket authenticates via JWT
+2. Join personal room (userId)
+3. When sending message:
+
+   * Save in DB
+   * Emit to receiver
+4. Update status:
+
+   * SENT → DELIVERED → READ
+
+---
+
+## 🧠 Delivery Logic
+
+* If receiver online → deliver instantly
+* If offline → store in DB → deliver on next connect
+
+---
+
+## 🔔 Notifications
+
+* If user offline:
+
+  * Trigger push notification (Firebase)
+
+---
+
+## 🛡️ Safety Features
+
+* Blocked users cannot message
+* Report chat option
+* Basic content filtering
+
+---
+
+## 🔐 Security
+
+* Authenticate socket connections (JWT)
+* Validate message payloads
+* Rate limit messages (prevent spam)
+
+---
+
+## ⚡ Performance Optimization
+
+* Use Redis adapter for Socket.io (scaling)
+* Batch DB writes if needed
+* Limit message payload size
+
+---
+
+## 🧪 Edge Cases
+
+Handle:
+
+* Duplicate messages
+* Network disconnects
+* Message retry
+* Out-of-order delivery
+
+---
+
+## 📦 Service Layer
+
+* chat.service.ts
+* message.service.ts
+* socket.handler.ts
+
+---
+
+## 🧪 Testing
+
+* Test message send/receive
+* Test offline delivery
+* Test read receipts
+
+---
+
+## 🚀 Deliverables
+
+* Fully working real-time chat system
+* Message persistence
+* Scalable socket architecture
+* Clean modular implementation
+
+---
+
+Ensure the chat system is **fast, reliable, and scalable for thousands of concurrent users**.

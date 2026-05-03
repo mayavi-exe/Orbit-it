@@ -1,0 +1,178 @@
+Extend the existing backend to implement a **production-grade User Profile system** for a college-based community and dating app using Node.js, Express, MongoDB (Mongoose), and TypeScript.
+
+## 🎯 Goal
+
+Create a scalable and flexible user profile system that supports:
+
+* Rich profiles
+* Privacy controls
+* Interest-based matching
+* Future extensibility (reputation, AI matching)
+
+---
+
+## 🧱 Update User Model (Mongoose Schema)
+
+Enhance the User schema with:
+
+### Basic Info:
+
+* name (string, required)
+* username (unique, optional)
+* email (college email, required, unique)
+* password (hashed)
+
+### Profile Info:
+
+* bio (string, max 300 chars)
+* gender (enum, optional)
+* age (number, optional)
+* profilePhotos (array of URLs)
+* collegeId (ObjectId ref College)
+
+### Interests & Social:
+
+* interests (array of strings, indexed)
+* clubs (array of strings)
+* socialLinks (optional: LinkedIn, Instagram)
+
+### Verification:
+
+* isEmailVerified (boolean)
+* isIdVerified (boolean)
+* verificationStatus (pending/approved/rejected)
+
+### Privacy Controls:
+
+* isProfilePublic (boolean)
+* showAge (boolean)
+* showGender (boolean)
+
+### App State:
+
+* profileCompleted (boolean)
+* isActive (boolean)
+* lastActiveAt (timestamp)
+
+### Metadata:
+
+* createdAt
+* updatedAt
+
+---
+
+## 📊 Indexing (IMPORTANT FOR SCALE)
+
+Add indexes for:
+
+* email (unique)
+* collegeId
+* interests
+* lastActiveAt
+
+---
+
+## 📡 Profile APIs
+
+### 1. Get My Profile
+
+GET /api/users/me
+
+* Return full user profile
+
+### 2. Update Profile
+
+PATCH /api/users/update-profile
+
+* Update bio, interests, clubs, etc.
+* Validate inputs (Zod/Joi)
+
+### 3. Upload Profile Photos
+
+POST /api/users/upload-photo
+
+* Upload to Cloudinary
+* Store secure URL
+
+### 4. Get User by ID
+
+GET /api/users/:id
+
+* Respect privacy settings
+
+---
+
+## 🔐 Privacy Logic (CRITICAL)
+
+Implement logic such that:
+
+* If profile is private → limited data shown
+* Respect:
+
+  * showAge
+  * showGender
+* Hide sensitive fields (email, password always)
+
+---
+
+## 🧠 Profile Completion Logic
+
+Define rules:
+
+* Minimum 1 photo
+* Bio required
+* At least 3 interests
+
+Set:
+
+* profileCompleted = true/false
+
+---
+
+## 🛡️ Security
+
+* Validate all inputs
+* Sanitize user-generated content
+* Prevent mass assignment vulnerabilities
+
+---
+
+## 🧪 Edge Cases
+
+Handle:
+
+* Duplicate usernames
+* Invalid image uploads
+* Empty interests
+* Unauthorized profile access
+
+---
+
+## 📦 Service Layer
+
+Create:
+
+* user.service.ts (business logic)
+* user.controller.ts
+* user.routes.ts
+
+---
+
+## 🧪 Testing
+
+* Unit tests for profile update
+* API test for GET /me
+
+---
+
+## 🚀 Deliverables
+
+* Updated User schema
+* Working profile APIs
+* Image upload integration
+* Privacy-safe responses
+* Clean modular code
+
+---
+
+Ensure the system is scalable, secure, and ready for matching and feed integration.
