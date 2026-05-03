@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   useWindowDimensions,
+  Image,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useTabPadding } from "@/hooks/useTabPadding";
@@ -21,7 +22,9 @@ import {
   getGetUserStatsQueryKey,
 } from "@workspace/api-client-react";
 import { Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { useQueryClient } from "@tanstack/react-query";
 
 const INTERESTS = [
@@ -47,15 +50,31 @@ const INTERESTS = [
   "Night Photography", "Videography", "Filmmaking", "Skateboarding", "Street Art",
 ];
 
+function getApiBase(): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  if (domain) return `https://${domain}/api`;
+  return "/api";
+}
+
+function objectPathToUrl(objectPath: string): string {
+  const apiBase = getApiBase();
+  if (objectPath.startsWith("http")) return objectPath;
+  const clean = objectPath.startsWith("/objects/")
+    ? objectPath.slice("/objects/".length)
+    : objectPath;
+  return `${apiBase}/storage/objects/${clean}`;
+}
+
 export default function ProfileScreen() {
   const colors = useColors();
   const { topPad, bottomPad } = useTabPadding();
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   const { user: clerkUser } = useUser();
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
 
   const [editing, setEditing] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const { data: meData, isLoading: meLoading } = useGetMe({
     query: { queryKey: getGetMeQueryKey() },
@@ -99,6 +118,66 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleChangePhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+
+    setPhotoUploading(true);
+    try {
+      const token = await getToken();
+      const apiBase = getApiBase();
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      const filename = asset.uri.split("/").pop() ?? "avatar.jpg";
+
+      const urlRes = await fetch(`${apiBase}/storage/uploads/request-url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: filename, size: 0, contentType: mimeType }),
+      });
+
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      const imgRes = await fetch(asset.uri);
+      const blob = await imgRes.blob();
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": mimeType },
+        body: blob,
+      });
+
+      if (!putRes.ok) throw new Error("Upload failed");
+
+      updateMutation.mutate(
+        { data: { profilePhotos: [objectPath] } },
+        {
+          onSuccess: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+          },
+          onError: () => {
+            Alert.alert("Error", "Photo uploaded but failed to save. Please try again.");
+          },
+        }
+      );
+    } catch {
+      Alert.alert("Upload Failed", "Could not upload photo. Please try again.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const handleLogout = () => {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -123,6 +202,9 @@ export default function ProfileScreen() {
 
   const user = meData;
   const avatarLetter = user?.name?.[0]?.toUpperCase() ?? clerkUser?.firstName?.[0]?.toUpperCase() ?? "?";
+  const avatarSize = Math.min(width * 0.26, 104);
+  const avatarRadius = avatarSize / 2;
+  const currentPhoto = user?.profilePhotos?.[0];
 
   return (
     <ScrollView
@@ -169,9 +251,36 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.avatarSection}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary, width: Math.min(width * 0.24, 96), height: Math.min(width * 0.24, 96), borderRadius: Math.min(width * 0.12, 48) }]}>
-          <Text style={[styles.avatarText, { fontSize: Math.min(width * 0.1, 38) }]}>{avatarLetter}</Text>
-        </View>
+        <TouchableOpacity
+          style={[styles.avatarWrapper, { width: avatarSize, height: avatarSize }]}
+          onPress={handleChangePhoto}
+          activeOpacity={0.85}
+        >
+          {currentPhoto ? (
+            <Image
+              source={{ uri: objectPathToUrl(currentPhoto) }}
+              style={[styles.avatarImage, { width: avatarSize, height: avatarSize, borderRadius: avatarRadius }]}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.avatarFallback, { width: avatarSize, height: avatarSize, borderRadius: avatarRadius, backgroundColor: colors.primary }]}>
+              <Text style={[styles.avatarText, { fontSize: Math.min(width * 0.1, 40) }]}>{avatarLetter}</Text>
+            </View>
+          )}
+
+          {photoUploading ? (
+            <View style={[styles.avatarOverlay, { borderRadius: avatarRadius }]}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          ) : (
+            <View style={[styles.cameraBtn, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+              <Feather name="camera" size={13} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <Text style={[styles.photoHint, { color: colors.mutedForeground }]}>Tap to change photo</Text>
+
         <Text style={[styles.name, { color: colors.foreground }]}>{user?.name ?? clerkUser?.fullName ?? "User"}</Text>
         {user?.username && (
           <View style={[styles.usernameBadge, { backgroundColor: colors.primary + "18" }]}>
@@ -300,12 +409,39 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     gap: 6,
   },
-  avatar: {
+  avatarWrapper: {
+    position: "relative",
+    marginBottom: 2,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarFallback: {
+    width: "100%",
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
   },
   avatarText: { color: "#fff", fontWeight: "bold" },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraBtn: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
+  photoHint: { fontSize: 12, marginBottom: 4 },
   name: { fontSize: 24, fontWeight: "bold" },
   usernameBadge: {
     paddingHorizontal: 14,
