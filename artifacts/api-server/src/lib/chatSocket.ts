@@ -7,6 +7,7 @@ import { logger } from "./logger.js";
 export interface WsMessage {
   type: "new_message" | "typing" | "read" | "ping" | "pong";
   conversationId?: string;
+  readerId?: string;
   message?: {
     id: string;
     conversationId: string;

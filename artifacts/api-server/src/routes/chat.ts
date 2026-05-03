@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, conversationsTable, messagesTable, usersTable, collegesTable } from "@workspace/db";
-import { eq, and, or, lt, desc } from "drizzle-orm";
+import { eq, and, or, lt, desc, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { mapPublicProfile } from "./users.js";
 import { broadcastToConversation } from "../lib/chatSocket.js";
@@ -75,6 +75,36 @@ router.post("/chat/start", requireAuth, async (req, res) => {
   res.json(await formatConversation(conv, myId));
 });
 
+async function markConversationRead(conv: typeof conversationsTable.$inferSelect, currentUserId: string) {
+  const unreadUpdate = conv.user1Id === currentUserId ? { unreadCount1: 0 } : { unreadCount2: 0 };
+  await db.update(conversationsTable).set(unreadUpdate).where(eq(conversationsTable.id, conv.id));
+
+  const unreadReceived = await db.select({ id: messagesTable.id })
+    .from(messagesTable)
+    .where(and(
+      eq(messagesTable.conversationId, conv.id),
+      eq(messagesTable.receiverId, currentUserId),
+      ne(messagesTable.status, "READ"),
+    ))
+    .limit(1);
+
+  if (unreadReceived.length > 0) {
+    await db.update(messagesTable)
+      .set({ status: "READ" })
+      .where(and(
+        eq(messagesTable.conversationId, conv.id),
+        eq(messagesTable.receiverId, currentUserId),
+        ne(messagesTable.status, "READ"),
+      ));
+
+    broadcastToConversation(conv.user1Id, conv.user2Id, {
+      type: "read",
+      conversationId: conv.id,
+      readerId: currentUserId,
+    });
+  }
+}
+
 router.get("/chat/:conversationId/messages", requireAuth, async (req, res) => {
   const conversationId = req.params["conversationId"] as string;
   const cursor = req.query["cursor"] as string | undefined;
@@ -99,11 +129,24 @@ router.get("/chat/:conversationId/messages", requireAuth, async (req, res) => {
   const hasMore = messages.length > limit;
   const items = messages.slice(0, limit);
 
-  await db.update(conversationsTable)
-    .set(conv.user1Id === req.userId! ? { unreadCount1: 0 } : { unreadCount2: 0 })
-    .where(eq(conversationsTable.id, conversationId!));
+  await markConversationRead(conv, req.userId!);
 
   res.json({ messages: items.map(formatMessage), nextCursor: hasMore ? items[items.length - 1]!.createdAt.toISOString() : null });
+});
+
+router.post("/chat/:conversationId/read", requireAuth, async (req, res) => {
+  const conversationId = req.params["conversationId"] as string;
+
+  const [conv] = await db.select().from(conversationsTable)
+    .where(and(
+      eq(conversationsTable.id, conversationId!),
+      or(eq(conversationsTable.user1Id, req.userId!), eq(conversationsTable.user2Id, req.userId!)),
+    )).limit(1);
+
+  if (!conv) { res.status(404).json({ error: "NOT_FOUND", message: "Conversation not found" }); return; }
+
+  await markConversationRead(conv, req.userId!);
+  res.json({ success: true });
 });
 
 router.post("/chat/:conversationId/messages", requireAuth, async (req, res) => {

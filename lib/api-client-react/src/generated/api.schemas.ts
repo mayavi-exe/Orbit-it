@@ -391,6 +391,10 @@ export type GetMessagesParams = {
   cursor?: string;
 };
 
+export type MarkMessagesRead200 = {
+  success: boolean;
+};
+
 export type GetRecommendationsParams = {
   limit?: number;
 };

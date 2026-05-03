@@ -45,6 +45,7 @@ import type {
   HealthStatus,
   LikeResponse,
   LoginRequest,
+  MarkMessagesRead200,
   MatchStats,
   Message,
   MessagesResponse,
@@ -1848,6 +1849,93 @@ export const useSendMessage = <
   TContext
 > => {
   return useMutation(getSendMessageMutationOptions(options));
+};
+
+/**
+ * @summary Mark all messages in conversation as read
+ */
+export const getMarkMessagesReadUrl = (conversationId: string) => {
+  return `/api/chat/${conversationId}/read`;
+};
+
+export const markMessagesRead = async (
+  conversationId: string,
+  options?: RequestInit,
+): Promise<MarkMessagesRead200> => {
+  return customFetch<MarkMessagesRead200>(
+    getMarkMessagesReadUrl(conversationId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getMarkMessagesReadMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof markMessagesRead>>,
+    TError,
+    { conversationId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof markMessagesRead>>,
+  TError,
+  { conversationId: string },
+  TContext
+> => {
+  const mutationKey = ["markMessagesRead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof markMessagesRead>>,
+    { conversationId: string }
+  > = (props) => {
+    const { conversationId } = props ?? {};
+
+    return markMessagesRead(conversationId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type MarkMessagesReadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof markMessagesRead>>
+>;
+
+export type MarkMessagesReadMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mark all messages in conversation as read
+ */
+export const useMarkMessagesRead = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof markMessagesRead>>,
+    TError,
+    { conversationId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof markMessagesRead>>,
+  TError,
+  { conversationId: string },
+  TContext
+> => {
+  return useMutation(getMarkMessagesReadMutationOptions(options));
 };
 
 /**

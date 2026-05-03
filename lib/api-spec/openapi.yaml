@@ -488,6 +488,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/Message"
 
+  /chat/{conversationId}/read:
+    post:
+      operationId: markMessagesRead
+      tags: [chat]
+      summary: Mark all messages in conversation as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required:
+                  - success
+
   # --- MATCH ---
   /match/recommendations:
     get:

@@ -25,12 +25,7 @@ import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useChatSocket, type ChatMessage } from "@/hooks/useChatSocket";
-import { UserAvatar } from "@/components/UserAvatar";
-
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+import { UserAvatar, getApiBase } from "@/components/UserAvatar";
 
 function formatGroupHeader(dateStr: string): string {
   const d = new Date(dateStr);
@@ -40,12 +35,23 @@ function formatGroupHeader(dateStr: string): string {
     d.getMonth() === now.getMonth() &&
     d.getFullYear() === now.getFullYear();
   if (isToday) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) +
+  return (
+    d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) +
     " · " +
-    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
 }
 
 const TIME_GAP_MS = 30 * 60 * 1000;
+
+async function callMarkRead(conversationId: string) {
+  try {
+    const base = getApiBase();
+    await fetch(`${base}/api/chat/${conversationId}/read`, { method: "POST" });
+  } catch {
+    // non-critical
+  }
+}
 
 export default function ChatRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -56,6 +62,7 @@ export default function ChatRoomScreen() {
   const navigation = useNavigation();
   const [message, setMessage] = useState("");
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+  const [readByOther, setReadByOther] = useState(false);
   const listRef = useRef<FlatList>(null);
   const initializedRef = useRef(false);
 
@@ -71,7 +78,6 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     if (otherUser?.name) {
       navigation.setOptions({
-        title: otherUser.name,
         headerTitleAlign: "center" as const,
         headerTitle: () => (
           <View style={{ alignItems: "center" }}>
@@ -99,9 +105,14 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     if (data?.messages && !initializedRef.current) {
       initializedRef.current = true;
-      setLocalMessages([...(data.messages as ChatMessage[])].reverse());
+      const msgs = [...(data.messages as ChatMessage[])].reverse();
+      setLocalMessages(msgs);
+      const myId = user?.id;
+      if (msgs.some(m => m.senderId === myId && m.status === "READ")) {
+        setReadByOther(true);
+      }
     }
-  }, [data?.messages]);
+  }, [data?.messages, user?.id]);
 
   const handleNewMessage = useCallback(
     (msg: ChatMessage) => {
@@ -112,11 +123,25 @@ export default function ChatRoomScreen() {
         return [msg, ...prev];
       });
       queryClient.invalidateQueries({ queryKey: getGetConversationsQueryKey() });
+      if (id) void callMarkRead(id);
+    },
+    [user?.id, id]
+  );
+
+  const handleMessagesRead = useCallback(
+    (_convId: string, readerId: string) => {
+      if (readerId === user?.id) return;
+      setReadByOther(true);
+      setLocalMessages(prev =>
+        prev.map(m =>
+          m.senderId === user?.id && m.status !== "READ" ? { ...m, status: "READ" } : m
+        )
+      );
     },
     [user?.id]
   );
 
-  useChatSocket(id ?? null, handleNewMessage);
+  useChatSocket(id ?? null, handleNewMessage, handleMessagesRead);
 
   const handleSend = () => {
     const text = message.trim();
@@ -143,17 +168,29 @@ export default function ChatRoomScreen() {
   const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 4;
   const hasText = message.trim().length > 0;
 
-  type ItemType = ChatMessage | { type: "timestamp"; key: string; label: string };
+  type TimestampItem = { type: "timestamp"; key: string; label: string };
+  type ListItem = ChatMessage | TimestampItem;
 
-  const listData: ItemType[] = [];
+  const listData: ListItem[] = [];
   for (let i = 0; i < localMessages.length; i++) {
-    const msg = localMessages[i];
+    const msg = localMessages[i]!;
     const prev = localMessages[i + 1];
     listData.push(msg);
-    if (!prev || new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() > TIME_GAP_MS) {
-      listData.push({ type: "timestamp", key: `ts-${msg.id}`, label: formatGroupHeader(prev?.createdAt ?? msg.createdAt) });
+    const shouldShowTs =
+      !prev ||
+      new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() > TIME_GAP_MS;
+    if (shouldShowTs) {
+      listData.push({
+        type: "timestamp",
+        key: `ts-${msg.id}`,
+        label: formatGroupHeader(prev?.createdAt ?? msg.createdAt),
+      });
     }
   }
+
+  const lastSentIdx = readByOther
+    ? listData.findIndex(item => !("type" in item) && (item as ChatMessage).senderId === myId)
+    : -1;
 
   return (
     <KeyboardAvoidingView
@@ -191,43 +228,69 @@ export default function ChatRoomScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             if ("type" in item) {
               return (
                 <View style={styles.tsRow}>
-                  <Text style={[styles.tsText, { color: colors.mutedForeground }]}>{item.label}</Text>
+                  <Text style={[styles.tsText, { color: colors.mutedForeground }]}>
+                    {item.label}
+                  </Text>
                 </View>
               );
             }
             const isMe = item.senderId === myId;
+            const isLastSent = index === lastSentIdx;
+
             return (
-              <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
-                {!isMe && (
-                  <View style={styles.receiverAvatar}>
-                    <UserAvatar
-                      name={otherUser?.name ?? "?"}
-                      profilePhotos={otherUser?.profilePhotos}
-                      size={28}
-                    />
-                  </View>
-                )}
+              <View>
                 <View
                   style={[
-                    styles.bubble,
-                    isMe
-                      ? [styles.bubbleSent, { backgroundColor: colors.primary }]
-                      : [styles.bubbleReceived, { backgroundColor: colors.card }],
+                    styles.msgRow,
+                    isMe ? styles.msgRowRight : styles.msgRowLeft,
                   ]}
                 >
-                  <Text
+                  {!isMe && (
+                    <View style={styles.receiverAvatar}>
+                      <UserAvatar
+                        name={otherUser?.name ?? "?"}
+                        profilePhotos={otherUser?.profilePhotos}
+                        size={28}
+                      />
+                    </View>
+                  )}
+                  <View
                     style={[
-                      styles.bubbleText,
-                      { color: isMe ? colors.primaryForeground : colors.foreground },
+                      styles.bubble,
+                      isMe
+                        ? [styles.bubbleSent, { backgroundColor: colors.primary }]
+                        : [styles.bubbleReceived, { backgroundColor: colors.card }],
                     ]}
                   >
-                    {item.content}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.bubbleText,
+                        { color: isMe ? colors.primaryForeground : colors.foreground },
+                      ]}
+                    >
+                      {item.content}
+                    </Text>
+                  </View>
                 </View>
+
+                {isLastSent && (
+                  <View style={styles.seenRow}>
+                    <View style={styles.seenAvatar}>
+                      <UserAvatar
+                        name={otherUser?.name ?? "?"}
+                        profilePhotos={otherUser?.profilePhotos}
+                        size={16}
+                      />
+                    </View>
+                    <Text style={[styles.seenText, { color: colors.mutedForeground }]}>
+                      Seen
+                    </Text>
+                  </View>
+                )}
               </View>
             );
           }}
@@ -251,7 +314,12 @@ export default function ChatRoomScreen() {
           <Feather name="image" size={24} color={colors.foreground} />
         </TouchableOpacity>
 
-        <View style={[styles.inputPill, { backgroundColor: colors.input, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.inputPill,
+            { backgroundColor: colors.input, borderColor: colors.border },
+          ]}
+        >
           <TextInput
             style={[styles.input, { color: colors.foreground }]}
             value={message}
@@ -294,7 +362,12 @@ const styles = StyleSheet.create({
   emptyHint: { fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
   tsRow: { alignItems: "center", marginVertical: 12 },
   tsText: { fontSize: 12, fontWeight: "500" },
-  msgRow: { flexDirection: "row", alignItems: "flex-end", marginBottom: 4, gap: 6 },
+  msgRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginBottom: 4,
+    gap: 6,
+  },
   msgRowLeft: { justifyContent: "flex-start" },
   msgRowRight: { justifyContent: "flex-end" },
   receiverAvatar: { width: 28, flexShrink: 0 },
@@ -304,13 +377,20 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 20,
   },
-  bubbleSent: {
-    borderBottomRightRadius: 4,
-  },
-  bubbleReceived: {
-    borderBottomLeftRadius: 4,
-  },
+  bubbleSent: { borderBottomRightRadius: 4 },
+  bubbleReceived: { borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 15, lineHeight: 21 },
+  seenRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+    marginBottom: 6,
+    paddingRight: 2,
+  },
+  seenAvatar: { borderRadius: 8, overflow: "hidden" },
+  seenText: { fontSize: 11, fontWeight: "500" },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",

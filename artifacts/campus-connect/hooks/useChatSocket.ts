@@ -14,20 +14,24 @@ export interface ChatMessage {
 }
 
 interface WsEvent {
-  type: "new_message" | "typing" | "ping" | "pong";
+  type: "new_message" | "typing" | "read" | "ping" | "pong";
   conversationId?: string;
+  readerId?: string;
   message?: ChatMessage;
 }
 
 export function useChatSocket(
   conversationId: string | null,
-  onNewMessage: (msg: ChatMessage) => void
+  onNewMessage: (msg: ChatMessage) => void,
+  onMessagesRead?: (conversationId: string, readerId: string) => void
 ) {
   const { getToken, isSignedIn } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onNewMessageRef = useRef(onNewMessage);
+  const onMessagesReadRef = useRef(onMessagesRead);
   onNewMessageRef.current = onNewMessage;
+  onMessagesReadRef.current = onMessagesRead;
 
   const connect = useCallback(async () => {
     if (!isSignedIn || !conversationId) return;
@@ -58,6 +62,12 @@ export function useChatSocket(
           data.message
         ) {
           onNewMessageRef.current(data.message);
+        } else if (
+          data.type === "read" &&
+          data.conversationId === conversationId &&
+          data.readerId
+        ) {
+          onMessagesReadRef.current?.(conversationId, data.readerId);
         }
       } catch {
         // ignore parse errors
