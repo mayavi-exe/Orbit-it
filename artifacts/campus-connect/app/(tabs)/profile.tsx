@@ -26,6 +26,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useQueryClient } from "@tanstack/react-query";
+import { objectPathToUrl, getApiBase } from "@/components/UserAvatar";
 
 const INTERESTS = [
   "Music", "Sports", "Art", "Tech", "Gaming", "Travel",
@@ -50,20 +51,6 @@ const INTERESTS = [
   "Night Photography", "Videography", "Filmmaking", "Skateboarding", "Street Art",
 ];
 
-function getApiBase(): string {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  if (domain) return `https://${domain}/api`;
-  return "/api";
-}
-
-function objectPathToUrl(objectPath: string): string {
-  const apiBase = getApiBase();
-  if (objectPath.startsWith("http")) return objectPath;
-  const clean = objectPath.startsWith("/objects/")
-    ? objectPath.slice("/objects/".length)
-    : objectPath;
-  return `${apiBase}/storage/objects/${clean}`;
-}
 
 export default function ProfileScreen() {
   const colors = useColors();

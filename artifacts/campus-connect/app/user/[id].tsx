@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
@@ -15,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useGetUserById, useSubmitReport, useBlockUser, useStartConversation, getGetUserByIdQueryKey } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
+import { UserAvatar, objectPathToUrl } from "@/components/UserAvatar";
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -91,9 +93,7 @@ export default function UserProfileScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 40 : insets.bottom + 40 }}>
       <View style={styles.avatarSection}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{userProfile.name?.[0]?.toUpperCase() ?? "?"}</Text>
-        </View>
+        <UserAvatar name={userProfile.name} profilePhotos={userProfile.profilePhotos} size={96} />
         <Text style={[styles.name, { color: colors.foreground }]}>{userProfile.name}</Text>
         {userProfile.college && (
           <View style={[styles.collegeBadge, { backgroundColor: colors.secondary }]}>

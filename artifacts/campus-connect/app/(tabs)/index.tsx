@@ -29,6 +29,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useAuth } from "@clerk/expo";
+import { UserAvatar, objectPathToUrl, getApiBase } from "@/components/UserAvatar";
 
 type PostType = "TEXT" | "IMAGE" | "CONFESSION" | "EVENT";
 
@@ -51,12 +52,6 @@ interface PickedImage {
   objectPath: string | null;
   uploading: boolean;
   mimeType?: string;
-}
-
-function getApiBase(): string {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  if (domain) return `https://${domain}/api`;
-  return "/api";
 }
 
 export default function FeedScreen() {
@@ -248,15 +243,13 @@ export default function FeedScreen() {
     >
       <View style={styles.cardHeader}>
         <View style={styles.userInfo}>
-          <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
             {!item.isAnonymous && item.author?.name ? (
-              <Text style={[styles.avatarText, { color: colors.mutedForeground }]}>
-                {item.author.name[0].toUpperCase()}
-              </Text>
-            ) : (
+            <UserAvatar name={item.author.name} profilePhotos={item.author.profilePhotos} size={34} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
               <Feather name="user" size={14} color={colors.mutedForeground} />
-            )}
-          </View>
+            </View>
+          )}
           <View>
             <Text style={[styles.name, { color: colors.foreground }]}>
               {item.isAnonymous ? "Anonymous" : (item.author?.name ?? "User")}

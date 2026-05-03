@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
   TextInput,
+  Image,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useTabPadding } from "@/hooks/useTabPadding";
@@ -28,6 +29,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { UserAvatar, objectPathToUrl } from "@/components/UserAvatar";
 
 export default function DiscoverScreen() {
   const colors = useColors();
@@ -207,11 +209,7 @@ export default function DiscoverScreen() {
             ) : (
               (userResults?.users ?? []).map(u => (
                 <View key={u.id} style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.listAvatar, { backgroundColor: colors.primary + "30" }]}>
-                    <Text style={[styles.listAvatarText, { color: colors.primary }]}>
-                      {u.name[0]?.toUpperCase()}
-                    </Text>
-                  </View>
+                  <UserAvatar name={u.name} profilePhotos={u.profilePhotos} size={52} />
                   <View style={styles.listInfo}>
                     <Text style={[styles.listName, { color: colors.foreground }]}>{u.name}</Text>
                     {u.username && (
@@ -247,11 +245,7 @@ export default function DiscoverScreen() {
                 >
                   {p.author && (
                     <View style={styles.postAuthorRow}>
-                      <View style={[styles.postAvatar, { backgroundColor: colors.primary + "30" }]}>
-                        <Text style={[styles.postAvatarText, { color: colors.primary }]}>
-                          {p.author.name[0]?.toUpperCase()}
-                        </Text>
-                      </View>
+                      <UserAvatar name={p.author.name} profilePhotos={p.author.profilePhotos} size={36} />
                       <View>
                         <Text style={[styles.postAuthorName, { color: colors.foreground }]}>{p.author.name}</Text>
                         {p.author.username && (
@@ -307,11 +301,19 @@ export default function DiscoverScreen() {
               <Text style={styles.passTagText}>PASS</Text>
             </Animated.View>
 
-            <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Text style={[styles.photoInitial, { color: colors.mutedForeground }]}>
-                {current.user.name[0]?.toUpperCase()}
-              </Text>
-            </View>
+            {current.user.profilePhotos?.[0] ? (
+              <Image
+                source={{ uri: objectPathToUrl(current.user.profilePhotos[0]) }}
+                style={styles.heroPhoto}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
+                <Text style={[styles.photoInitial, { color: colors.mutedForeground }]}>
+                  {current.user.name[0]?.toUpperCase()}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.cardInfo}>
               <View style={styles.nameRow}>
@@ -366,11 +368,7 @@ export default function DiscoverScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}>
           {recs.slice(currentIndex).map(rec => (
             <View key={rec.user.id} style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.listAvatar, { backgroundColor: colors.primary + "30" }]}>
-                <Text style={[styles.listAvatarText, { color: colors.primary }]}>
-                  {rec.user.name[0]?.toUpperCase()}
-                </Text>
-              </View>
+              <UserAvatar name={rec.user.name} profilePhotos={rec.user.profilePhotos} size={52} />
               <View style={styles.listInfo}>
                 <Text style={[styles.listName, { color: colors.foreground }]}>{rec.user.name}</Text>
                 {rec.user.username && (
@@ -460,6 +458,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "15deg" }],
   },
   passTagText: { color: "#fff", fontWeight: "800", fontSize: 18 },
+  heroPhoto: { width: "100%", height: 240 },
   photoPlaceholder: { height: 240, alignItems: "center", justifyContent: "center" },
   photoInitial: { fontSize: 72, fontWeight: "800" },
   cardInfo: { padding: 20 },

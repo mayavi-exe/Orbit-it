@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Image,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useLocalSearchParams } from "expo-router";
@@ -24,6 +25,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -87,9 +89,17 @@ export default function PostDetailScreen() {
           post ? (
             <View style={[styles.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.postHeader}>
-                <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
-                  <Feather name="user" size={18} color={colors.mutedForeground} />
-                </View>
+                {post.isAnonymous ? (
+                  <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
+                    <Feather name="user" size={18} color={colors.mutedForeground} />
+                  </View>
+                ) : (
+                  <UserAvatar
+                    name={post.author?.name ?? "?"}
+                    profilePhotos={post.author?.profilePhotos}
+                    size={36}
+                  />
+                )}
                 <View>
                   <Text style={[styles.authorName, { color: colors.foreground }]}>
                     {post.isAnonymous ? "Anonymous" : (post.author?.name ?? "Unknown")}
@@ -117,9 +127,13 @@ export default function PostDetailScreen() {
         }
         renderItem={({ item }) => (
           <View style={[styles.commentRow, { borderBottomColor: colors.border }]}>
-            <View style={[styles.commentAvatar, { backgroundColor: colors.muted }]}>
-              <Feather name="user" size={14} color={colors.mutedForeground} />
-            </View>
+            {item.author?.name ? (
+              <UserAvatar name={item.author.name} profilePhotos={item.author.profilePhotos} size={30} />
+            ) : (
+              <View style={[styles.commentAvatar, { backgroundColor: colors.muted }]}>
+                <Feather name="user" size={14} color={colors.mutedForeground} />
+              </View>
+            )}
             <View style={styles.commentContent}>
               <Text style={[styles.commentName, { color: colors.foreground }]}>{item.author?.name ?? "User"}</Text>
               <Text style={[styles.commentText, { color: colors.foreground }]}>{item.content}</Text>
