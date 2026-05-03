@@ -28,10 +28,11 @@ export const usersTable = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    clerkId: text("clerk_id").unique(),
     name: text("name").notNull(),
     username: text("username").unique(),
     email: text("email").notNull().unique(),
-    passwordHash: text("password_hash").notNull(),
+    passwordHash: text("password_hash"),
     bio: text("bio"),
     gender: genderEnum("gender"),
     age: integer("age"),
@@ -64,6 +65,7 @@ export const usersTable = pgTable(
   (table) => [
     index("users_college_id_idx").on(table.collegeId),
     index("users_last_active_at_idx").on(table.lastActiveAt),
+    index("users_clerk_id_idx").on(table.clerkId),
   ],
 );
 

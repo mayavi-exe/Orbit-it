@@ -1,23 +1,10 @@
 import { Router } from "express";
 import { db, usersTable, collegesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { hashPassword, comparePassword, signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/auth.js";
+import { getAuth } from "@clerk/express";
 import { z } from "zod";
 
 const router = Router();
-
-const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(8),
-  collegeId: z.string().uuid(),
-  username: z.string().min(3).max(30).regex(/^[a-z0-9._]+$/).optional(),
-});
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
-});
 
 function mapUserToProfile(user: typeof usersTable.$inferSelect, college: typeof collegesTable.$inferSelect | null) {
   return {
@@ -65,18 +52,37 @@ async function generateUniqueUsername(name: string): Promise<string> {
   return `${base}.${Date.now().toString().slice(-6)}`;
 }
 
-router.post("/auth/register", async (req, res) => {
-  const parsed = registerSchema.safeParse(req.body);
+const provisionSchema = z.object({
+  name: z.string().min(2).max(100),
+  email: z.string().email(),
+  collegeId: z.string().uuid(),
+  username: z.string().min(3).max(30).regex(/^[a-z0-9._]+$/).optional(),
+});
+
+router.post("/auth/provision", async (req, res) => {
+  const auth = getAuth(req);
+  const clerkUserId = auth?.userId;
+
+  if (!clerkUserId) {
+    res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
+    return;
+  }
+
+  const parsed = provisionSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.message });
     return;
   }
 
-  const { name, email, password, collegeId, username: requestedUsername } = parsed.data;
+  const { name, email, collegeId, username: requestedUsername } = parsed.data;
 
-  const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  const [existing] = await db.select().from(usersTable)
+    .where(eq(usersTable.clerkId, clerkUserId))
+    .limit(1);
+
   if (existing) {
-    res.status(409).json({ error: "CONFLICT", message: "Email already registered" });
+    const [college] = await db.select().from(collegesTable).where(eq(collegesTable.id, existing.collegeId)).limit(1);
+    res.json({ user: mapUserToProfile(existing, college ?? null) });
     return;
   }
 
@@ -98,81 +104,30 @@ router.post("/auth/register", async (req, res) => {
     username = await generateUniqueUsername(name);
   }
 
-  const passwordHash = await hashPassword(password);
-  const [user] = await db.insert(usersTable).values({ name, username, email, passwordHash, collegeId }).returning();
-
-  const accessToken = signAccessToken({ userId: user.id, email: user.email });
-  const refreshToken = signRefreshToken({ userId: user.id, email: user.email });
-  await db.update(usersTable).set({ refreshToken }).where(eq(usersTable.id, user.id));
-
-  res.status(201).json({ accessToken, refreshToken, user: mapUserToProfile(user, college) });
-});
-
-router.post("/auth/login", async (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.message });
-    return;
-  }
-
-  const { email, password } = parsed.data;
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-
-  if (!user || !(await comparePassword(password, user.passwordHash))) {
-    res.status(401).json({ error: "UNAUTHORIZED", message: "Invalid credentials" });
-    return;
-  }
-
-  if (user.isBanned) {
-    res.status(403).json({ error: "FORBIDDEN", message: "Account banned" });
-    return;
-  }
-
-  const accessToken = signAccessToken({ userId: user.id, email: user.email });
-  const refreshToken = signRefreshToken({ userId: user.id, email: user.email });
-  await db.update(usersTable).set({ refreshToken, lastActiveAt: new Date() }).where(eq(usersTable.id, user.id));
-
-  const [college] = await db.select().from(collegesTable).where(eq(collegesTable.id, user.collegeId)).limit(1);
-  res.json({ accessToken, refreshToken, user: mapUserToProfile(user, college ?? null) });
-});
-
-router.post("/auth/refresh", async (req, res) => {
-  const { refreshToken } = req.body ?? {};
-  if (!refreshToken) {
-    res.status(400).json({ error: "VALIDATION_ERROR", message: "refreshToken required" });
-    return;
-  }
-
-  try {
-    const payload = verifyRefreshToken(refreshToken);
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1);
-    if (!user || user.refreshToken !== refreshToken) {
-      res.status(401).json({ error: "UNAUTHORIZED", message: "Invalid refresh token" });
-      return;
+  const [emailExists] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (emailExists) {
+    const [updated] = await db.update(usersTable)
+      .set({ clerkId: clerkUserId })
+      .where(eq(usersTable.id, emailExists.id))
+      .returning();
+    if (updated) {
+      const [c] = await db.select().from(collegesTable).where(eq(collegesTable.id, updated.collegeId)).limit(1);
+      res.json({ user: mapUserToProfile(updated, c ?? null) });
     }
-
-    const newAccess = signAccessToken({ userId: user.id, email: user.email });
-    const newRefresh = signRefreshToken({ userId: user.id, email: user.email });
-    await db.update(usersTable).set({ refreshToken: newRefresh }).where(eq(usersTable.id, user.id));
-
-    const [college] = await db.select().from(collegesTable).where(eq(collegesTable.id, user.collegeId)).limit(1);
-    res.json({ accessToken: newAccess, refreshToken: newRefresh, user: mapUserToProfile(user, college ?? null) });
-  } catch {
-    res.status(401).json({ error: "UNAUTHORIZED", message: "Invalid refresh token" });
+    return;
   }
-});
 
-router.post("/auth/logout", async (req, res) => {
-  const { refreshToken } = req.body ?? {};
-  if (refreshToken) {
-    try {
-      const payload = verifyRefreshToken(refreshToken);
-      await db.update(usersTable).set({ refreshToken: null }).where(eq(usersTable.id, payload.userId));
-    } catch {
-      // ignore
-    }
-  }
-  res.json({ success: true, message: "Logged out" });
+  const [user] = await db.insert(usersTable).values({
+    clerkId: clerkUserId,
+    name,
+    username,
+    email,
+    collegeId,
+    passwordHash: null,
+    isEmailVerified: true,
+  }).returning();
+
+  res.status(201).json({ user: mapUserToProfile(user, college) });
 });
 
 export default router;

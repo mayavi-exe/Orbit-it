@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@clerk/expo";
 
 export interface ChatMessage {
   id: string;
@@ -23,19 +23,22 @@ export function useChatSocket(
   conversationId: string | null,
   onNewMessage: (msg: ChatMessage) => void
 ) {
-  const { accessToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onNewMessageRef = useRef(onNewMessage);
   onNewMessageRef.current = onNewMessage;
 
-  const connect = useCallback(() => {
-    if (!accessToken || !conversationId) return;
+  const connect = useCallback(async () => {
+    if (!isSignedIn || !conversationId) return;
 
     const domain = process.env["EXPO_PUBLIC_DOMAIN"];
     if (!domain) return;
 
-    const url = `wss://${domain}/api/ws?token=${encodeURIComponent(accessToken)}`;
+    const token = await getToken();
+    if (!token) return;
+
+    const url = `wss://${domain}/api/ws?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
@@ -63,17 +66,17 @@ export function useChatSocket(
 
     ws.onclose = (event) => {
       if (event.code !== 1000 && event.code !== 1001) {
-        reconnectTimer.current = setTimeout(() => connect(), 3000);
+        reconnectTimer.current = setTimeout(() => void connect(), 3000);
       }
     };
 
     ws.onerror = () => {
       ws.close();
     };
-  }, [accessToken, conversationId]);
+  }, [isSignedIn, conversationId, getToken]);
 
   useEffect(() => {
-    connect();
+    void connect();
 
     return () => {
       if (reconnectTimer.current) {

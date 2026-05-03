@@ -1,6 +1,12 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
+/**
+ * Clerk-backed auth context shim.
+ * Provides the same `useAuth()` API used by legacy screens,
+ * backed by Clerk's useAuth + the /api/users/me endpoint.
+ */
+import React, { createContext, useContext } from "react";
+import { useAuth as useClerkAuth } from "@clerk/expo";
+import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export type AuthUser = {
   id: string;
@@ -24,10 +30,7 @@ export type AuthUser = {
 
 interface AuthContextType {
   user: AuthUser | null;
-  accessToken: string | null;
   isLoading: boolean;
-  login: (data: { user: AuthUser; accessToken: string; refreshToken: string }) => Promise<void>;
-  register: (data: { user: AuthUser; accessToken: string; refreshToken: string }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<AuthUser>) => void;
 }
@@ -35,59 +38,50 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const tokenRef = useRef<string | null>(null);
+  const { signOut, isSignedIn } = useClerkAuth();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    setAuthTokenGetter(() => tokenRef.current);
-    loadAuth();
-  }, []);
+  const { data: meData, isLoading } = useGetMe({
+    query: {
+      queryKey: getGetMeQueryKey(),
+      enabled: !!isSignedIn,
+      retry: false,
+    },
+  });
 
-  const loadAuth = async () => {
-    try {
-      const raw = await AsyncStorage.getItem("auth");
-      if (raw) {
-        const { user: savedUser, accessToken: savedToken } = JSON.parse(raw);
-        setUser(savedUser);
-        setAccessToken(savedToken);
-        tokenRef.current = savedToken;
+  const user: AuthUser | null = meData
+    ? {
+        id: meData.id,
+        name: meData.name,
+        email: meData.email ?? "",
+        username: meData.username,
+        bio: meData.bio,
+        gender: meData.gender,
+        age: meData.age,
+        interests: meData.interests,
+        clubs: meData.clubs,
+        profilePhotos: meData.profilePhotos,
+        collegeId: meData.collegeId,
+        college: meData.college ?? null,
+        isEmailVerified: meData.isEmailVerified,
+        profileCompleted: meData.profileCompleted,
+        isProfilePublic: meData.isProfilePublic,
+        showAge: meData.showAge,
+        showGender: meData.showGender,
       }
-    } catch (e) {
-      // ignore
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (data: { user: AuthUser; accessToken: string; refreshToken: string }) => {
-    setUser(data.user);
-    setAccessToken(data.accessToken);
-    tokenRef.current = data.accessToken;
-    await AsyncStorage.setItem("auth", JSON.stringify(data));
-  };
-
-  const register = async (data: { user: AuthUser; accessToken: string; refreshToken: string }) => {
-    setUser(data.user);
-    setAccessToken(data.accessToken);
-    tokenRef.current = data.accessToken;
-    await AsyncStorage.setItem("auth", JSON.stringify(data));
-  };
+    : null;
 
   const logout = async () => {
-    setUser(null);
-    setAccessToken(null);
-    tokenRef.current = null;
-    await AsyncStorage.removeItem("auth");
+    await signOut();
+    queryClient.clear();
   };
 
-  const updateUser = (updates: Partial<AuthUser>) => {
-    setUser(prev => prev ? { ...prev, ...updates } : prev);
+  const updateUser = (_updates: Partial<AuthUser>) => {
+    queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
   };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

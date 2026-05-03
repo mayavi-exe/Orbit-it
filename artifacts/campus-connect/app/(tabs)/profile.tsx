@@ -9,17 +9,19 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, useUser } from "@clerk/expo";
 import {
+  useGetMe,
   useGetUserStats,
   useUpdateProfile,
   getGetMeQueryKey,
   getGetUserStatsQueryKey,
 } from "@workspace/api-client-react";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -32,18 +34,33 @@ const INTERESTS = [
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout, updateUser } = useAuth();
+  const { signOut } = useAuth();
+  const { user: clerkUser } = useUser();
   const queryClient = useQueryClient();
+  const { width } = useWindowDimensions();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
   const [editing, setEditing] = useState(false);
-  const [bio, setBio] = useState(user?.bio ?? "");
-  const [interests, setInterests] = useState<string[]>(user?.interests ?? []);
+
+  const { data: meData, isLoading: meLoading } = useGetMe({
+    query: { queryKey: getGetMeQueryKey() },
+  });
+
+  const [bio, setBio] = useState("");
+  const [interests, setInterests] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (meData && !editing) {
+      setBio(meData.bio ?? "");
+      setInterests(meData.interests ?? []);
+    }
+  }, [meData, editing]);
 
   const { data: stats } = useGetUserStats({
     query: { queryKey: getGetUserStatsQueryKey() },
   });
+
   const updateMutation = useUpdateProfile();
 
   const toggleInterest = (interest: string) => {
@@ -56,9 +73,8 @@ export default function ProfileScreen() {
     updateMutation.mutate(
       { data: { bio, interests } },
       {
-        onSuccess: (updated) => {
+        onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          updateUser({ bio: updated.bio, interests: updated.interests });
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           setEditing(false);
         },
@@ -70,11 +86,29 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive", onPress: logout },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          await signOut();
+          queryClient.clear();
+        },
+      },
     ]);
   };
+
+  if (meLoading) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const user = meData;
+  const avatarLetter = user?.name?.[0]?.toUpperCase() ?? clerkUser?.firstName?.[0]?.toUpperCase() ?? "?";
 
   return (
     <ScrollView
@@ -95,7 +129,7 @@ export default function ProfileScreen() {
                   setInterests(user?.interests ?? []);
                 }}
               >
-                <Feather name="x" size={18} color={colors.mutedForeground} />
+                <Ionicons name="close" size={18} color={colors.mutedForeground} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.headerBtn, { backgroundColor: colors.primary }]}
@@ -105,7 +139,7 @@ export default function ProfileScreen() {
                 {updateMutation.isPending ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Feather name="check" size={18} color="#fff" />
+                  <Ionicons name="checkmark" size={18} color="#fff" />
                 )}
               </TouchableOpacity>
             </>
@@ -114,26 +148,26 @@ export default function ProfileScreen() {
               style={[styles.headerBtn, { backgroundColor: colors.muted }]}
               onPress={() => setEditing(true)}
             >
-              <Feather name="edit-2" size={18} color={colors.mutedForeground} />
+              <Ionicons name="create-outline" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       <View style={styles.avatarSection}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() ?? "?"}</Text>
+        <View style={[styles.avatar, { backgroundColor: colors.primary, width: Math.min(width * 0.24, 96), height: Math.min(width * 0.24, 96), borderRadius: Math.min(width * 0.12, 48) }]}>
+          <Text style={[styles.avatarText, { fontSize: Math.min(width * 0.1, 38) }]}>{avatarLetter}</Text>
         </View>
-        <Text style={[styles.name, { color: colors.foreground }]}>{user?.name ?? "User"}</Text>
+        <Text style={[styles.name, { color: colors.foreground }]}>{user?.name ?? clerkUser?.fullName ?? "User"}</Text>
         {user?.username && (
-          <View style={[styles.usernameBadge, { backgroundColor: colors.primary + "15" }]}>
+          <View style={[styles.usernameBadge, { backgroundColor: colors.primary + "18" }]}>
             <Text style={[styles.usernameText, { color: colors.primary }]}>@{user.username}</Text>
           </View>
         )}
-        <Text style={[styles.email, { color: colors.mutedForeground }]}>{user?.email ?? ""}</Text>
+        <Text style={[styles.email, { color: colors.mutedForeground }]}>{user?.email ?? clerkUser?.primaryEmailAddress?.emailAddress ?? ""}</Text>
         {user?.college && (
           <View style={[styles.collegeBadge, { backgroundColor: colors.secondary }]}>
-            <Feather name="map-pin" size={12} color={colors.primary} />
+            <Ionicons name="location-outline" size={12} color={colors.primary} />
             <Text style={[styles.collegeText, { color: colors.secondaryForeground }]}>
               {user.college.name}
             </Text>
@@ -143,11 +177,18 @@ export default function ProfileScreen() {
 
       <View style={[styles.statsRow, { borderColor: colors.border }]}>
         {[
-          { label: "Posts", value: stats?.postsCount ?? 0 },
-          { label: "Matches", value: stats?.matchesCount ?? 0 },
-          { label: "Likes", value: stats?.likesReceived ?? 0 },
+          { label: "Posts", value: stats?.postsCount ?? 0, icon: "newspaper-outline" },
+          { label: "Matches", value: stats?.matchesCount ?? 0, icon: "heart-outline" },
+          { label: "Likes", value: stats?.likesReceived ?? 0, icon: "thumbs-up-outline" },
         ].map((s, i) => (
-          <View key={s.label} style={[styles.stat, i < 2 && { borderRightWidth: 1, borderRightColor: colors.border }]}>
+          <View
+            key={s.label}
+            style={[
+              styles.stat,
+              i < 2 && { borderRightWidth: 1, borderRightColor: colors.border },
+            ]}
+          >
+            <Ionicons name={s.icon as any} size={18} color={colors.primary} style={{ marginBottom: 4 }} />
             <Text style={[styles.statValue, { color: colors.foreground }]}>{s.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
@@ -180,7 +221,10 @@ export default function ProfileScreen() {
             {INTERESTS.map(interest => (
               <TouchableOpacity
                 key={interest}
-                style={[styles.tag, { backgroundColor: interests.includes(interest) ? colors.primary : colors.muted }]}
+                style={[
+                  styles.tag,
+                  { backgroundColor: interests.includes(interest) ? colors.primary : colors.muted },
+                ]}
                 onPress={() => toggleInterest(interest)}
               >
                 <Text style={{ color: interests.includes(interest) ? colors.primaryForeground : colors.mutedForeground, fontSize: 13, fontWeight: "600" }}>
@@ -198,7 +242,12 @@ export default function ProfileScreen() {
             ))}
           </View>
         ) : (
-          <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>No interests yet. Tap edit to add some.</Text>
+          <View style={styles.emptyInterests}>
+            <Ionicons name="heart-outline" size={28} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontSize: 14, textAlign: "center" }}>
+              No interests yet.{"\n"}Tap edit to add some.
+            </Text>
+          </View>
         )}
       </View>
 
@@ -206,8 +255,8 @@ export default function ProfileScreen() {
         style={[styles.logoutBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
         onPress={handleLogout}
       >
-        <Feather name="log-out" size={18} color={colors.destructive} />
-        <Text style={[styles.logoutText, { color: colors.destructive }]}>Logout</Text>
+        <Ionicons name="log-out-outline" size={18} color={colors.destructive} />
+        <Text style={[styles.logoutText, { color: colors.destructive }]}>Sign out</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -215,29 +264,95 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
   title: { fontSize: 28, fontWeight: "bold" },
   headerActions: { flexDirection: "row", gap: 8 },
-  headerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  avatarSection: { alignItems: "center", paddingVertical: 24, gap: 6 },
-  avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  avatarText: { color: "#fff", fontSize: 36, fontWeight: "bold" },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarSection: {
+    alignItems: "center",
+    paddingVertical: 24,
+    gap: 6,
+  },
+  avatar: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  avatarText: { color: "#fff", fontWeight: "bold" },
   name: { fontSize: 24, fontWeight: "bold" },
-  usernameBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
+  usernameBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
   usernameText: { fontSize: 16, fontWeight: "700" },
   email: { fontSize: 14 },
-  collegeBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  collegeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
   collegeText: { fontSize: 13, fontWeight: "600" },
-  statsRow: { flexDirection: "row", borderTopWidth: 1, borderBottomWidth: 1, marginHorizontal: 16, marginBottom: 24 },
-  stat: { flex: 1, alignItems: "center", paddingVertical: 16 },
+  statsRow: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    marginHorizontal: 16,
+    marginBottom: 24,
+  },
+  stat: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 16,
+  },
   statValue: { fontSize: 22, fontWeight: "bold" },
   statLabel: { fontSize: 12, marginTop: 2 },
-  section: { marginHorizontal: 16, marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1 },
+  section: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+  },
   sectionLabel: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
-  bioInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: "top" },
+  bioInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
   bioText: { fontSize: 15, lineHeight: 22 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: 16, marginTop: 8, marginBottom: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
+  emptyInterests: { alignItems: "center", gap: 8, paddingVertical: 12 },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
   logoutText: { fontSize: 16, fontWeight: "600" },
 });

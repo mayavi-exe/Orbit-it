@@ -3,11 +3,21 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import { Feather } from "@expo/vector-icons";
-import React from "react";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import React, { useEffect } from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
-
+import { useAuth } from "@clerk/expo";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
+
+function useClerkToken() {
+  const { isSignedIn, getToken } = useAuth();
+  useEffect(() => {
+    if (isSignedIn) {
+      setAuthTokenGetter(() => getToken());
+    }
+  }, [isSignedIn, getToken]);
+}
 
 function NativeTabLayout() {
   return (
@@ -33,6 +43,8 @@ function NativeTabLayout() {
 }
 
 function ClassicTabLayout() {
+  useClerkToken();
+
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -61,12 +73,7 @@ function ClassicTabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
           ) : null,
       }}
     >
@@ -74,11 +81,11 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: "Feed",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
+              <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={24} />
             ) : (
-              <Feather name="home" size={22} color={color} />
+              <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
             ),
         }}
       />
@@ -86,23 +93,23 @@ function ClassicTabLayout() {
         name="discover"
         options={{
           title: "Discover",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name="sparkles" tintColor={color} size={24} />
             ) : (
-              <Feather name="compass" size={22} color={color} />
+              <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat",
-          tabBarIcon: ({ color }) =>
+          title: "Messages",
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="message" tintColor={color} size={24} />
+              <SymbolView name={focused ? "message.fill" : "message"} tintColor={color} size={24} />
             ) : (
-              <Feather name="message-square" size={22} color={color} />
+              <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
             ),
         }}
       />
@@ -110,11 +117,11 @@ function ClassicTabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="person.crop.circle" tintColor={color} size={24} />
+              <SymbolView name={focused ? "person.crop.circle.fill" : "person.crop.circle"} tintColor={color} size={24} />
             ) : (
-              <Feather name="user" size={22} color={color} />
+              <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={24} color={color} />
             ),
         }}
       />

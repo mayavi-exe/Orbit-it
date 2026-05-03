@@ -1,5 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import { verifyAccessToken } from "../lib/auth.js";
+import { getAuth } from "@clerk/express";
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 declare global {
   namespace Express {
@@ -10,20 +13,36 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "UNAUTHORIZED", message: "Missing or invalid authorization header" });
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const auth = getAuth(req);
+  const clerkUserId = auth?.userId;
+
+  if (!clerkUserId) {
+    res.status(401).json({ error: "UNAUTHORIZED", message: "Authentication required" });
     return;
   }
 
-  const token = authHeader.slice(7);
   try {
-    const payload = verifyAccessToken(token);
-    req.userId = payload.userId;
-    req.userEmail = payload.email;
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email, isBanned: usersTable.isBanned })
+      .from(usersTable)
+      .where(eq(usersTable.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!user) {
+      res.status(401).json({ error: "ONBOARDING_REQUIRED", message: "Please complete your profile setup" });
+      return;
+    }
+
+    if (user.isBanned) {
+      res.status(403).json({ error: "FORBIDDEN", message: "Account suspended" });
+      return;
+    }
+
+    req.userId = user.id;
+    req.userEmail = user.email;
     next();
-  } catch {
-    res.status(401).json({ error: "UNAUTHORIZED", message: "Invalid or expired token" });
+  } catch (err) {
+    next(err);
   }
 }
