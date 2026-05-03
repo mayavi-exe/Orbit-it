@@ -13,17 +13,26 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
-import { useGetUserStats, useUpdateProfile, getGetMeQueryKey, getGetUserStatsQueryKey } from "@workspace/api-client-react";
+import {
+  useGetUserStats,
+  useUpdateProfile,
+  getGetMeQueryKey,
+  getGetUserStatsQueryKey,
+} from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 
-const INTERESTS = ["Music", "Sports", "Art", "Tech", "Gaming", "Travel", "Food", "Books", "Movies", "Dance", "Fitness", "Photography", "Fashion", "Politics", "Memes"];
+const INTERESTS = [
+  "Music", "Sports", "Art", "Tech", "Gaming", "Travel",
+  "Food", "Books", "Movies", "Dance", "Fitness", "Photography",
+  "Fashion", "Politics", "Memes",
+];
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const queryClient = useQueryClient();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
@@ -32,15 +41,14 @@ export default function ProfileScreen() {
   const [bio, setBio] = useState(user?.bio ?? "");
   const [interests, setInterests] = useState<string[]>(user?.interests ?? []);
 
-  const { data: stats } = useGetUserStats(
-    undefined,
-    { query: { queryKey: getGetUserStatsQueryKey() } }
-  );
+  const { data: stats } = useGetUserStats({
+    query: { queryKey: getGetUserStatsQueryKey() },
+  });
   const updateMutation = useUpdateProfile();
 
   const toggleInterest = (interest: string) => {
-    setInterests((prev) =>
-      prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]
+    setInterests(prev =>
+      prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
     );
   };
 
@@ -48,13 +56,14 @@ export default function ProfileScreen() {
     updateMutation.mutate(
       { data: { bio, interests } },
       {
-        onSuccess: () => {
+        onSuccess: (updated) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          updateUser({ bio: updated.bio, interests: updated.interests });
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           setEditing(false);
         },
         onError: () => {
-          Alert.alert("Error", "Failed to update profile. Please try again.");
+          Alert.alert("Error", "Failed to update profile.");
         },
       }
     );
@@ -78,15 +87,33 @@ export default function ProfileScreen() {
         <View style={styles.headerActions}>
           {editing ? (
             <>
-              <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.muted }]} onPress={() => setEditing(false)}>
+              <TouchableOpacity
+                style={[styles.headerBtn, { backgroundColor: colors.muted }]}
+                onPress={() => {
+                  setEditing(false);
+                  setBio(user?.bio ?? "");
+                  setInterests(user?.interests ?? []);
+                }}
+              >
                 <Feather name="x" size={18} color={colors.mutedForeground} />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.primary }]} onPress={saveProfile} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="check" size={18} color="#fff" />}
+              <TouchableOpacity
+                style={[styles.headerBtn, { backgroundColor: colors.primary }]}
+                onPress={saveProfile}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Feather name="check" size={18} color="#fff" />
+                )}
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.muted }]} onPress={() => setEditing(true)}>
+            <TouchableOpacity
+              style={[styles.headerBtn, { backgroundColor: colors.muted }]}
+              onPress={() => setEditing(true)}
+            >
               <Feather name="edit-2" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
@@ -102,18 +129,20 @@ export default function ProfileScreen() {
         {user?.college && (
           <View style={[styles.collegeBadge, { backgroundColor: colors.secondary }]}>
             <Feather name="map-pin" size={12} color={colors.primary} />
-            <Text style={[styles.collegeText, { color: colors.secondaryForeground }]}>{user.college.name}</Text>
+            <Text style={[styles.collegeText, { color: colors.secondaryForeground }]}>
+              {user.college.name}
+            </Text>
           </View>
         )}
       </View>
 
       <View style={[styles.statsRow, { borderColor: colors.border }]}>
         {[
-          { label: "Posts", value: stats?.postsCount ?? 0, icon: "file-text" },
-          { label: "Matches", value: stats?.matchesCount ?? 0, icon: "heart" },
-          { label: "Likes", value: stats?.likesReceived ?? 0, icon: "thumbs-up" },
-        ].map((s) => (
-          <View key={s.label} style={styles.stat}>
+          { label: "Posts", value: stats?.postsCount ?? 0 },
+          { label: "Matches", value: stats?.matchesCount ?? 0 },
+          { label: "Likes", value: stats?.likesReceived ?? 0 },
+        ].map((s, i) => (
+          <View key={s.label} style={[styles.stat, i < 2 && { borderRightWidth: 1, borderRightColor: colors.border }]}>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{s.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
@@ -143,7 +172,7 @@ export default function ProfileScreen() {
         <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Interests</Text>
         {editing ? (
           <View style={styles.tags}>
-            {INTERESTS.map((interest) => (
+            {INTERESTS.map(interest => (
               <TouchableOpacity
                 key={interest}
                 style={[styles.tag, { backgroundColor: interests.includes(interest) ? colors.primary : colors.muted }]}
@@ -157,18 +186,21 @@ export default function ProfileScreen() {
           </View>
         ) : user?.interests && user.interests.length > 0 ? (
           <View style={styles.tags}>
-            {user.interests.map((i) => (
+            {user.interests.map(i => (
               <View key={i} style={[styles.tag, { backgroundColor: colors.accent }]}>
                 <Text style={{ color: colors.accentForeground, fontSize: 13, fontWeight: "600" }}>{i}</Text>
               </View>
             ))}
           </View>
         ) : (
-          <Text style={[{ color: colors.mutedForeground }]}>No interests added yet.</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>No interests yet. Tap edit to add some.</Text>
         )}
       </View>
 
-      <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.muted, borderColor: colors.border }]} onPress={handleLogout}>
+      <TouchableOpacity
+        style={[styles.logoutBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+        onPress={handleLogout}
+      >
         <Feather name="log-out" size={18} color={colors.destructive} />
         <Text style={[styles.logoutText, { color: colors.destructive }]}>Logout</Text>
       </TouchableOpacity>
@@ -182,11 +214,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: "bold" },
   headerActions: { flexDirection: "row", gap: 8 },
   headerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  avatarSection: { alignItems: "center", paddingVertical: 24 },
-  avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  avatarSection: { alignItems: "center", paddingVertical: 24, gap: 6 },
+  avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   avatarText: { color: "#fff", fontSize: 36, fontWeight: "bold" },
-  name: { fontSize: 24, fontWeight: "bold", marginBottom: 4 },
-  email: { fontSize: 14, marginBottom: 10 },
+  name: { fontSize: 24, fontWeight: "bold" },
+  email: { fontSize: 14 },
   collegeBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   collegeText: { fontSize: 13, fontWeight: "600" },
   statsRow: { flexDirection: "row", borderTopWidth: 1, borderBottomWidth: 1, marginHorizontal: 16, marginBottom: 24 },

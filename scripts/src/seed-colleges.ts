@@ -1,5 +1,4 @@
 import { db, collegesTable } from "@workspace/db";
-import { sql } from "drizzle-orm";
 
 const colleges = [
   { name: "NMIMS University", domain: "nmims.edu", location: "Mumbai, Maharashtra" },

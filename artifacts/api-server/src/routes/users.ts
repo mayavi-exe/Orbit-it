@@ -117,7 +117,7 @@ router.get("/users/stats", requireAuth, async (req, res) => {
 });
 
 router.get("/users/:userId", requireAuth, async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.params["userId"] as string;
   const [user] = await db.select().from(usersTable).where(and(eq(usersTable.id, userId), eq(usersTable.isBanned, false))).limit(1);
   if (!user) { res.status(404).json({ error: "NOT_FOUND", message: "User not found" }); return; }
 

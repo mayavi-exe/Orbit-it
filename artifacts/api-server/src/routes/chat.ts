@@ -3,6 +3,7 @@ import { db, conversationsTable, messagesTable, usersTable, collegesTable } from
 import { eq, and, or, lt, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { mapPublicProfile } from "./users.js";
+import { broadcastToConversation } from "../lib/chatSocket.js";
 import { z } from "zod";
 
 const router = Router();
@@ -21,6 +22,20 @@ async function formatConversation(conv: typeof conversationsTable.$inferSelect, 
     lastMessageAt: conv.lastMessageAt?.toISOString() ?? null,
     unreadCount,
     createdAt: conv.createdAt.toISOString(),
+  };
+}
+
+function formatMessage(m: typeof messagesTable.$inferSelect) {
+  return {
+    id: m.id,
+    conversationId: m.conversationId,
+    senderId: m.senderId,
+    receiverId: m.receiverId,
+    content: m.content ?? null,
+    mediaUrl: m.mediaUrl ?? null,
+    messageType: m.messageType,
+    status: m.status,
+    createdAt: m.createdAt.toISOString(),
   };
 }
 
@@ -61,7 +76,7 @@ router.post("/chat/start", requireAuth, async (req, res) => {
 });
 
 router.get("/chat/:conversationId/messages", requireAuth, async (req, res) => {
-  const { conversationId } = req.params;
+  const conversationId = req.params["conversationId"] as string;
   const cursor = req.query["cursor"] as string | undefined;
   const limit = 30;
 
@@ -84,30 +99,18 @@ router.get("/chat/:conversationId/messages", requireAuth, async (req, res) => {
   const hasMore = messages.length > limit;
   const items = messages.slice(0, limit);
 
-  const formatted = items.map(m => ({
-    id: m.id,
-    conversationId: m.conversationId,
-    senderId: m.senderId,
-    receiverId: m.receiverId,
-    content: m.content ?? null,
-    mediaUrl: m.mediaUrl ?? null,
-    messageType: m.messageType,
-    status: m.status,
-    createdAt: m.createdAt.toISOString(),
-  }));
-
   await db.update(conversationsTable)
     .set(conv.user1Id === req.userId! ? { unreadCount1: 0 } : { unreadCount2: 0 })
     .where(eq(conversationsTable.id, conversationId!));
 
-  res.json({ messages: formatted, nextCursor: hasMore ? items[items.length - 1].createdAt.toISOString() : null });
+  res.json({ messages: items.map(formatMessage), nextCursor: hasMore ? items[items.length - 1]!.createdAt.toISOString() : null });
 });
 
 router.post("/chat/:conversationId/messages", requireAuth, async (req, res) => {
-  const { conversationId } = req.params;
+  const conversationId = req.params["conversationId"] as string;
   const parsed = z.object({
-    content: z.string().optional(),
-    mediaUrl: z.string().optional(),
+    content: z.string().min(1).optional(),
+    mediaUrl: z.string().url().optional(),
     messageType: z.enum(["TEXT", "IMAGE"]),
   }).safeParse(req.body);
 
@@ -134,7 +137,10 @@ router.post("/chat/:conversationId/messages", requireAuth, async (req, res) => {
     status: "SENT",
   }).returning();
 
-  const unreadField = conv.user1Id === req.userId! ? { unreadCount2: conv.unreadCount2 + 1 } : { unreadCount1: conv.unreadCount1 + 1 };
+  const unreadField = conv.user1Id === req.userId!
+    ? { unreadCount2: conv.unreadCount2 + 1 }
+    : { unreadCount1: conv.unreadCount1 + 1 };
+
   await db.update(conversationsTable).set({
     lastMessage: content ?? "Media",
     lastMessageAt: new Date(),
@@ -142,17 +148,15 @@ router.post("/chat/:conversationId/messages", requireAuth, async (req, res) => {
     ...unreadField,
   }).where(eq(conversationsTable.id, conversationId!));
 
-  res.status(201).json({
-    id: msg.id,
-    conversationId: msg.conversationId,
-    senderId: msg.senderId,
-    receiverId: msg.receiverId,
-    content: msg.content ?? null,
-    mediaUrl: msg.mediaUrl ?? null,
-    messageType: msg.messageType,
-    status: msg.status,
-    createdAt: msg.createdAt.toISOString(),
+  const formatted = formatMessage(msg);
+
+  broadcastToConversation(conv.user1Id, conv.user2Id, {
+    type: "new_message",
+    conversationId: conversationId!,
+    message: formatted,
   });
+
+  res.status(201).json(formatted);
 });
 
 export default router;

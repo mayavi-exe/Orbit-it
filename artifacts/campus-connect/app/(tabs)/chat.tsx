@@ -32,10 +32,9 @@ export default function ChatScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
-  const { data, isLoading, refetch } = useGetConversations(
-    undefined,
-    { query: { queryKey: getGetConversationsQueryKey() } }
-  );
+  const { data, isLoading, refetch } = useGetConversations({
+    query: { queryKey: getGetConversationsQueryKey() },
+  });
 
   const conversations = data?.conversations ?? [];
 
@@ -60,7 +59,9 @@ export default function ChatScreen() {
             <View style={styles.center}>
               <Feather name="message-square" size={48} color={colors.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No messages yet</Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Match with someone to start chatting</Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                Match with someone to start chatting
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -68,13 +69,19 @@ export default function ChatScreen() {
               style={[styles.row, { borderBottomColor: colors.border }]}
               onPress={() => router.push(`/chat/${item.id}` as any)}
             >
-              <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
-                <Feather name="user" size={22} color={colors.mutedForeground} />
+              <View style={[styles.avatar, { backgroundColor: colors.primary + "30" }]}>
+                <Text style={[styles.avatarText, { color: colors.primary }]}>
+                  {item.otherUser?.name?.[0]?.toUpperCase() ?? "?"}
+                </Text>
               </View>
               <View style={styles.info}>
                 <View style={styles.nameRow}>
-                  <Text style={[styles.name, { color: colors.foreground }]}>{item.otherUser?.name ?? "User"}</Text>
-                  <Text style={[styles.time, { color: colors.mutedForeground }]}>{timeAgo(item.lastMessageAt)}</Text>
+                  <Text style={[styles.name, { color: colors.foreground }]}>
+                    {item.otherUser?.name ?? "User"}
+                  </Text>
+                  <Text style={[styles.time, { color: colors.mutedForeground }]}>
+                    {timeAgo(item.lastMessageAt)}
+                  </Text>
                 </View>
                 <View style={styles.previewRow}>
                   <Text style={[styles.preview, { color: colors.mutedForeground }]} numberOfLines={1}>
@@ -97,13 +104,27 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingBottom: 8 },
+  header: { paddingHorizontal: 16, paddingBottom: 10 },
   title: { fontSize: 28, fontWeight: "bold" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingTop: 60 },
   emptyTitle: { fontSize: 20, fontWeight: "bold" },
   emptyText: { fontSize: 15, textAlign: "center", paddingHorizontal: 32 },
-  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, gap: 12 },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { fontWeight: "700", fontSize: 20 },
   info: { flex: 1 },
   nameRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   name: { fontSize: 16, fontWeight: "600" },

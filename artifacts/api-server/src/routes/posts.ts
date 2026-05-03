@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, postsTable, commentsTable, likesTable, usersTable, collegesTable, blocksTable } from "@workspace/db";
-import { eq, and, lt, desc, sql, or, inArray } from "drizzle-orm";
+import { eq, and, lt, gt, desc, sql, or, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { z } from "zod";
 import { mapPublicProfile } from "./users.js";
@@ -109,7 +109,7 @@ router.get("/posts/trending", requireAuth, async (req, res) => {
 
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const posts = await db.select().from(postsTable)
-    .where(and(eq(postsTable.collegeId, user.collegeId), lt(oneDayAgo, postsTable.createdAt)))
+    .where(and(eq(postsTable.collegeId, user.collegeId), gt(postsTable.createdAt, oneDayAgo)))
     .orderBy(desc(postsTable.likesCount), desc(postsTable.commentsCount))
     .limit(20);
 
@@ -118,13 +118,13 @@ router.get("/posts/trending", requireAuth, async (req, res) => {
 });
 
 router.get("/posts/:postId", requireAuth, async (req, res) => {
-  const [post] = await db.select().from(postsTable).where(eq(postsTable.id, req.params["postId"]!)).limit(1);
+  const [post] = await db.select().from(postsTable).where(eq(postsTable.id, req.params["postId"] as string)).limit(1);
   if (!post) { res.status(404).json({ error: "NOT_FOUND", message: "Post not found" }); return; }
   res.json(await formatPost(post, req.userId!));
 });
 
 router.post("/posts/:postId/like", requireAuth, async (req, res) => {
-  const postId = req.params["postId"]!;
+  const postId = req.params["postId"] as string;
   const userId = req.userId!;
 
   const [post] = await db.select({ id: postsTable.id, likesCount: postsTable.likesCount }).from(postsTable).where(eq(postsTable.id, postId)).limit(1);
@@ -144,7 +144,7 @@ router.post("/posts/:postId/like", requireAuth, async (req, res) => {
 });
 
 router.get("/posts/:postId/comments", requireAuth, async (req, res) => {
-  const postId = req.params["postId"]!;
+  const postId = req.params["postId"] as string;
   const cursor = req.query["cursor"] as string | undefined;
   const limit = 20;
 
@@ -176,7 +176,7 @@ router.get("/posts/:postId/comments", requireAuth, async (req, res) => {
 });
 
 router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
-  const postId = req.params["postId"]!;
+  const postId = req.params["postId"] as string;
   const { content } = req.body ?? {};
 
   if (!content?.trim()) {

@@ -52,7 +52,7 @@ router.post("/block", requireAuth, async (req, res) => {
 
 router.delete("/block/:userId", requireAuth, async (req, res) => {
   await db.delete(blocksTable)
-    .where(and(eq(blocksTable.blockerId, req.userId!), eq(blocksTable.blockedUserId, req.params["userId"]!)));
+    .where(and(eq(blocksTable.blockerId, req.userId!), eq(blocksTable.blockedUserId, req.params["userId"] as string)));
   res.json({ success: true, message: "User unblocked" });
 });
 
