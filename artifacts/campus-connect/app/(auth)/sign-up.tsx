@@ -273,6 +273,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     justifyContent: "center",
+    maxWidth: Platform.OS === "web" ? 480 : undefined,
+    width: "100%",
+    alignSelf: "center",
   },
   inner: {
     flex: 1,

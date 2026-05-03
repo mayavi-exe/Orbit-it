@@ -46,8 +46,8 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
+  const topPad = Platform.OS === "web" ? 16 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 80;
 
   const [filter, setFilter] = useState<PostType | undefined>(undefined);
   const [showCreate, setShowCreate] = useState(false);

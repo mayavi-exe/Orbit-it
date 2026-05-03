@@ -38,8 +38,8 @@ export default function ProfileScreen() {
   const { user: clerkUser } = useUser();
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
+  const topPad = Platform.OS === "web" ? 16 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 16 : insets.bottom + 80;
 
   const [editing, setEditing] = useState(false);
 

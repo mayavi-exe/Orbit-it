@@ -8,14 +8,19 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Platform,
 } from "react-native";
 import { useUser, useAuth } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
-import { useGetColleges } from "@workspace/api-client-react";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
+import {
+  useGetColleges,
+  setAuthTokenGetter,
+  getGetMeQueryKey,
+} from "@workspace/api-client-react";
 
 function slugify(name: string): string {
   return name
@@ -26,15 +31,28 @@ function slugify(name: string): string {
     .slice(0, 20);
 }
 
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
+
 export default function OnboardingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useUser();
+  const queryClient = useQueryClient();
+  const { user, isLoaded: userLoaded } = useUser();
   const { getToken } = useAuth();
 
+  const defaultEmail =
+    user?.primaryEmailAddress?.emailAddress ??
+    user?.emailAddresses?.[0]?.emailAddress ??
+    "";
+
   const defaultName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
-  const defaultEmail = user?.primaryEmailAddress?.emailAddress ?? "";
 
   const [name, setName] = useState(defaultName);
   const [username, setUsername] = useState(slugify(defaultName));
@@ -53,8 +71,25 @@ export default function OnboardingScreen() {
   const { data: collegesData, isLoading: loadingColleges } = useGetColleges();
 
   const handleContinue = async () => {
-    if (!name.trim() || !collegeId || !defaultEmail) {
-      Alert.alert("Missing info", "Please fill in your name and select your college.");
+    if (!name.trim()) {
+      showAlert("Missing info", "Please fill in your name.");
+      return;
+    }
+    if (!collegeId) {
+      showAlert("Missing info", "Please select your college.");
+      return;
+    }
+    if (!userLoaded) return;
+
+    const email =
+      defaultEmail ||
+      user?.emailAddresses?.[0]?.emailAddress;
+
+    if (!email) {
+      showAlert(
+        "Error",
+        "Could not load your email address. Please sign out and try again."
+      );
       return;
     }
 
@@ -62,13 +97,15 @@ export default function OnboardingScreen() {
     try {
       const token = await getToken();
       if (!token) {
-        Alert.alert("Error", "Not authenticated. Please sign in again.");
+        showAlert("Error", "Not authenticated. Please sign in again.");
         return;
       }
 
-      setAuthTokenGetter(() => Promise.resolve(token));
+      const baseUrl = process.env.EXPO_PUBLIC_DOMAIN
+        ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+        : "";
 
-      const res = await fetch(`https://${process.env.EXPO_PUBLIC_DOMAIN}/api/auth/provision`, {
+      const res = await fetch(`${baseUrl}/api/auth/provision`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -76,35 +113,50 @@ export default function OnboardingScreen() {
         },
         body: JSON.stringify({
           name: name.trim(),
-          email: defaultEmail,
+          email,
           collegeId,
           username: displayUsername || undefined,
         }),
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         if (err.error === "CONFLICT") {
-          Alert.alert("Username taken", "That username is already in use. Please choose another.");
+          showAlert(
+            "Username taken",
+            "That username is already in use. Please choose another."
+          );
           return;
         }
-        Alert.alert("Error", err.message ?? "Failed to set up profile. Please try again.");
+        showAlert(
+          "Error",
+          err.message ?? "Failed to set up profile. Please try again."
+        );
         return;
       }
 
       setAuthTokenGetter(() => getToken());
+      await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       router.replace("/(tabs)" as any);
     } catch {
-      Alert.alert("Error", "Network error. Please try again.");
+      showAlert("Error", "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const canSubmit = !!(name.trim() && collegeId && userLoaded && !loading);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[
+        styles.container,
+        {
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+        },
+      ]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -112,99 +164,146 @@ export default function OnboardingScreen() {
         <View style={[styles.logoCircle, { backgroundColor: colors.primary }]}>
           <Ionicons name="person-add-outline" size={28} color="#fff" />
         </View>
-        <Text style={[styles.title, { color: colors.foreground }]}>Complete your profile</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>
+          Complete your profile
+        </Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
           One last step — tell us about yourself
         </Text>
       </View>
 
-      <View style={styles.form}>
-        <Text style={[styles.label, { color: colors.foreground }]}>Your name</Text>
-        <View style={[styles.inputWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <Ionicons name="person-outline" size={18} color={colors.mutedForeground} />
-          <TextInput
-            style={[styles.inputField, { color: colors.foreground }]}
-            placeholder="Full name"
-            placeholderTextColor={colors.mutedForeground}
-            value={name}
-            onChangeText={handleNameChange}
-          />
+      {!userLoaded ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+            Loading your account…
+          </Text>
         </View>
-
-        <Text style={[styles.label, { color: colors.foreground }]}>Username</Text>
-        <View style={[styles.inputWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <Text style={[styles.atSign, { color: colors.primary }]}>@</Text>
-          <TextInput
-            style={[styles.inputField, { color: colors.foreground }]}
-            placeholder="your.handle"
-            placeholderTextColor={colors.mutedForeground}
-            value={displayUsername}
-            onChangeText={(val) => {
-              setUsername(val.toLowerCase().replace(/[^a-z0-9._]/g, ""));
-              setUsernameEdited(true);
-            }}
-            autoCapitalize="none"
-            maxLength={30}
-          />
-        </View>
-        <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-          <Ionicons name="lock-closed-outline" size={11} /> This cannot be changed later
-        </Text>
-
-        <Text style={[styles.label, { color: colors.foreground, marginTop: 8 }]}>Select your college</Text>
-        {loadingColleges ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
-        ) : (
-          <View style={styles.collegeGrid}>
-            {(collegesData?.colleges ?? []).map((college) => (
-              <TouchableOpacity
-                key={college.id}
-                style={[
-                  styles.collegeChip,
-                  {
-                    backgroundColor: collegeId === college.id ? colors.primary : colors.card,
-                    borderColor: collegeId === college.id ? colors.primary : colors.border,
-                  },
-                ]}
-                onPress={() => setCollegeId(college.id)}
-              >
-                <Ionicons
-                  name="school-outline"
-                  size={14}
-                  color={collegeId === college.id ? "#fff" : colors.mutedForeground}
-                />
-                <Text
-                  style={[
-                    styles.collegeChipText,
-                    { color: collegeId === college.id ? "#fff" : colors.foreground },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {college.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+      ) : (
+        <View style={styles.form}>
+          <Text style={[styles.label, { color: colors.foreground }]}>
+            Your name
+          </Text>
+          <View
+            style={[
+              styles.inputWrapper,
+              { backgroundColor: colors.input, borderColor: colors.border },
+            ]}
+          >
+            <Ionicons name="person-outline" size={18} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.inputField, { color: colors.foreground }]}
+              placeholder="Full name"
+              placeholderTextColor={colors.mutedForeground}
+              value={name}
+              onChangeText={handleNameChange}
+            />
           </View>
-        )}
 
-        <TouchableOpacity
-          style={[
-            styles.continueBtn,
-            { backgroundColor: colors.primary, opacity: (!name.trim() || !collegeId || loading) ? 0.6 : 1 },
-          ]}
-          onPress={handleContinue}
-          disabled={!name.trim() || !collegeId || loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
+          <Text style={[styles.label, { color: colors.foreground }]}>
+            Username
+          </Text>
+          <View
+            style={[
+              styles.inputWrapper,
+              { backgroundColor: colors.input, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.atSign, { color: colors.primary }]}>@</Text>
+            <TextInput
+              style={[styles.inputField, { color: colors.foreground }]}
+              placeholder="your.handle"
+              placeholderTextColor={colors.mutedForeground}
+              value={displayUsername}
+              onChangeText={(val) => {
+                setUsername(val.toLowerCase().replace(/[^a-z0-9._]/g, ""));
+                setUsernameEdited(true);
+              }}
+              autoCapitalize="none"
+              maxLength={30}
+            />
+          </View>
+          <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+            <Ionicons name="lock-closed-outline" size={11} /> This cannot be
+            changed later
+          </Text>
+
+          <Text
+            style={[styles.label, { color: colors.foreground, marginTop: 8 }]}
+          >
+            Select your college
+          </Text>
+          {loadingColleges ? (
+            <ActivityIndicator
+              color={colors.primary}
+              style={{ marginVertical: 12 }}
+            />
           ) : (
-            <>
-              <Text style={styles.continueBtnText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </>
+            <View style={styles.collegeGrid}>
+              {(collegesData?.colleges ?? []).map((college) => (
+                <TouchableOpacity
+                  key={college.id}
+                  style={[
+                    styles.collegeChip,
+                    {
+                      backgroundColor:
+                        collegeId === college.id
+                          ? colors.primary
+                          : colors.card,
+                      borderColor:
+                        collegeId === college.id
+                          ? colors.primary
+                          : colors.border,
+                    },
+                  ]}
+                  onPress={() => setCollegeId(college.id)}
+                >
+                  <Ionicons
+                    name="school-outline"
+                    size={14}
+                    color={
+                      collegeId === college.id ? "#fff" : colors.mutedForeground
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.collegeChipText,
+                      {
+                        color:
+                          collegeId === college.id ? "#fff" : colors.foreground,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {college.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
+
+          <TouchableOpacity
+            style={[
+              styles.continueBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: canSubmit ? 1 : 0.6,
+              },
+            ]}
+            onPress={handleContinue}
+            disabled={!canSubmit}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.continueBtnText}>Continue</Text>
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -235,6 +334,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: "center",
     lineHeight: 22,
+  },
+  loadingBox: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 14,
   },
   form: {
     gap: 12,
