@@ -1,5 +1,5 @@
 # 📱 CampusConnect  
-### 🎓 Private College Community & Dating App
+### 🎓 Private College Community App
 
 <p align="center">
   <img src="https://via.placeholder.com/800x400?text=CampusConnect+App+Preview" alt="App Preview"/>
