@@ -119,10 +119,3 @@ Unlike traditional apps, it focuses on:
 
 ---
 
-## 🚀 Getting Started
-
-### 1️⃣ Clone Repository
-
-```bash
-git clone https://github.com/your-username/campusconnect.git
-cd campusconnect
